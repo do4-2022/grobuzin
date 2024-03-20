@@ -1,6 +1,9 @@
 package routes
 
 import (
+	"log"
+
+	"github.com/do4-2022/grobuzin/routes/user"
 	"github.com/do4-2022/grobuzin/routes/function"
 	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
@@ -10,12 +13,12 @@ import (
 func GetRoutes(db *gorm.DB, JWTSecret string, BuilderEndpoint string, minioClient *minio.Client) *gin.Engine {
 	router := gin.Default()
 
-	// requireAuthMiddleware := user.RequireAuth(JWTSecret)
+	requireAuthMiddleware := user.RequireAuth(JWTSecret)
 
-	// log.Println("Setting up routes", requireAuthMiddleware)
+	log.Println("Setting up routes", requireAuthMiddleware)
 
 	function.ConfigureRoutes(router, db, minioClient, BuilderEndpoint)
-	// user.ConfigureRoutes(router, db, JWTSecret)
+	user.ConfigureRoutes(router, db, JWTSecret)
 
 	return router
 

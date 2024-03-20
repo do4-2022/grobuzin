@@ -7,7 +7,7 @@ import (
 
 // put
 var (
-	models = []interface{}{&User{}, &Function{}}
+	models = []interface{}{&User{}, Function{}, &FunctionState{}}
 )
 
 func Init(dsn string) *gorm.DB {
