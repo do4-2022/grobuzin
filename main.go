@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/do4-2022/grobuzin/database"
 	"github.com/do4-2022/grobuzin/routes"
 )
@@ -8,6 +10,12 @@ import (
 func main() {
 	db := database.Init()
 
-	r := routes.GetRoutes(db)
+	// get from env
+	JWTSecret := os.Getenv("JWT_SECRET")
+	if JWTSecret == "" {
+		panic("JWT_SECRET is not set")
+	}
+
+	r := routes.GetRoutes(db, JWTSecret)
 	r.Run()
 }
