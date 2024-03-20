@@ -1,0 +1,38 @@
+services:
+  functionState:
+    image: bitnami/redis:latest
+    environment:
+      - REDIS_PASSWORD=password
+      - REDIS_DATABASE=functionState
+    ports:
+      - 6379:6379
+    volumes:
+      - function_data:/bitnami/redis/data
+
+  VMState:
+    image: bitnami/postgresql:latest
+    environment:
+      - POSTGRESQL_PASSWORD=password
+      - POSTGRESQL_DATABASE=VMState
+      - POSTGRESQL_USERNAME=user
+    ports:
+      - 5432:5432
+    volumes:
+      - vm_data:/bitnami/postgresql/data
+
+
+  FNStorage:
+    image: bitnami/minio:latest
+    environment:
+      - MINIO_ROOT_PASSWORD=password
+      - MINIO_ROOT_USER=minio
+    ports:
+      - 9000:9000
+      - 9001:9001
+    volumes:
+      - minio_data:/bitnami/minio/data
+
+volumes:
+  minio_data:
+  vm_data:
+  function_data:
