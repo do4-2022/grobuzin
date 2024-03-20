@@ -1,0 +1,177 @@
+openapi: "3.0.2"
+info:
+  title: Grobuzin
+  version: "1.0"
+servers:
+  - url: https://api.server.test/v1
+paths:
+  /function:
+    get:
+      security:
+        - bearerAuth: []
+      description: List functions
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/functionInfo"
+      tags:
+        - developer
+
+    post:
+      security:
+        - bearerAuth: []
+      description: Create a new function
+      responses:
+        "201":
+          description: Created
+      tags:
+        - developer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/functionDefinition"
+  /function/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Function ID
+    put:
+      tags:
+        - developer
+      security:
+        - bearerAuth: []
+      description: Overwrite the function information
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/functionDefinition"
+      responses:
+        "200":
+          description: Updated
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - developer
+      description: Get function
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/functionDefinition"
+    delete:
+      security:
+        - bearerAuth: []
+      tags:
+        - developer
+      description: Delete function
+      responses:
+        "204":
+          description: No content
+  /function/{id}/run:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Function ID
+    post:
+      description: Run function
+      responses:
+        "200":
+          description: variable body
+      tags:
+        - user
+  /user:
+    post:
+      description: Create a new user
+      responses:
+        "201":
+          description: Created
+      tags:
+        - user management
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+  /user/login:
+    post:
+      description: Login
+      tags:
+        - user management
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    functionDefinition:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        language:
+          type: string
+        code:
+          type: string
+    functionInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        language:
+          type: string
+
+tags:
+  - name: developer
+    description: Developer operations
+  - name: user
+    description: User operations
+  - name: user management
+    description: User management operations
