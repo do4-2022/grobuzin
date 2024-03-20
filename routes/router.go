@@ -9,7 +9,7 @@ func GetRoutes(db *gorm.DB) *gin.Engine {
 
 	router := gin.Default()
 
-	controller := Controller{}
+	controller := Controller{DB: db}
 
 	router.POST("/user", controller.createUser)
 
