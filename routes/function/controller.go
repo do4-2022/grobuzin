@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"time"
 	"net/http"
 
 	"github.com/do4-2022/grobuzin/database"
@@ -167,3 +169,57 @@ type BuilderRequest struct {
 	Files   map[string]string `json:"files"`
 	Variant string            `json:"variant"`
 }
+
+func (c *Controller) RunFunction(ctx *gin.Context) {
+    fnID, err := uuid.Parse(ctx.Param("id"))
+	
+	//var fnBody any; // because the body is entirely defined by the user, we just forward it to the function without checking it
+
+	if err != nil {
+		ctx.AbortWithStatusJSON(400, gin.H{"error": "Invalid function ID"})
+		return
+	}
+
+	var fn database.FunctionState
+	err = c.DB.Where(&database.FunctionState{FunctionID: fnID}).First(&fn).Error
+
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		ctx.AbortWithStatusJSON(404, gin.H{"error": "Function not found"})
+		return
+	}
+
+	if fn.Status != "Ready" {
+		log.Println("Waiting for function", fn.ID, "to be ready")
+		time.Sleep(100 * time.Millisecond)
+
+		for attempts := 0; attempts < 5; attempts++ {
+			err = c.DB.Where(&database.FunctionState{FunctionID: fnID, Status: "Ready"}).First(&fn).Error
+
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				log.Println(err)
+				ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
+				return
+			} else {
+				log.Println("Function", fn.FunctionID, "is not ready yet... Retrying")
+
+				time.Sleep(100 * time.Millisecond)
+			}
+
+			if fn.Status == "Ready" { 
+				log.Println("Function", fn.FunctionID, "is ready")
+
+				break 
+			};
+
+		}
+
+		if fn.Status != "Ready" {
+			ctx.AbortWithStatusJSON(500, gin.H{"error": "Function is not ready"})
+			return
+		}
+	}
+
+	// TODO: forward the body to fn.Address:fn.Port
+	ctx.JSON(200, fn)
+}
+

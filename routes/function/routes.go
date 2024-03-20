@@ -21,4 +21,5 @@ func ConfigureRoutes(router *gin.Engine, db *gorm.DB, minioClient *minio.Client,
 	group.GET("/:id", controller.GetOneFunction)
 	group.PUT("/:id", controller.PutFunction)
 	group.DELETE("/:id", controller.DeleteFunction)
+	group.POST("/:id/run", controller.RunFunction)
 }

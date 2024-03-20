@@ -10,4 +10,9 @@ type Function struct {
 	Description string    `json:"description"`
 	Language    string    `json:"language"`
 	Built       bool      `json:"built"` // The builder has built the image for this function
+
+	OwnerID int  `json:"owner_id"`
+	Owner   User `json:"-"`
+
+	FunctionStates []FunctionState `json:"-"`
 }
