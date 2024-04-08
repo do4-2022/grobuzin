@@ -12,6 +12,16 @@ import (
 // You want to add this middleware to a group (router.Group()) of routes that require authentication.
 // JWTSecret is the secret key used to sign the JWT tokens.
 // This middleware will set the "userID" and "username" keys in the gin.Context.
+//
+// # Example:
+//
+//	func ConfigureRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string) {
+//		controller := Controller{DB: db, JWTSecret: jwtSecret}
+//		group := router.Group("/my-prefix")
+//		group.Use(RequireAuth(jwtSecret))
+//		group.POST("/", controller.postFunction)
+//		group.GET("/test", controller.testFunction)
+//	}
 func RequireAuth(JWTSecret string) gin.HandlerFunc {
 
 	parsefunc := func(token *jwt.Token) (interface{}, error) {

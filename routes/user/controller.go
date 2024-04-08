@@ -14,6 +14,8 @@ func ConfigureRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string) {
 	controller := Controller{DB: db, JWTSecret: jwtSecret}
 	group := router.Group("/user")
 
+	group.Use(RequireAuth(jwtSecret))
+
 	group.POST("/", controller.createUser)
 	group.POST("/login", controller.login)
 }
