@@ -8,6 +8,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Middleware that requires a valid JWT token to be present in the Authorization header, meaning the user has an account to modify the functions they own.
+// You want to add this middleware to a group (router.Group()) of routes that require authentication.
+// JWTSecret is the secret key used to sign the JWT tokens.
+// This middleware will set the "userID" and "username" keys in the gin.Context.
 func RequireAuth(JWTSecret string) gin.HandlerFunc {
 
 	parsefunc := func(token *jwt.Token) (interface{}, error) {
@@ -17,6 +21,7 @@ func RequireAuth(JWTSecret string) gin.HandlerFunc {
 
 		return []byte(JWTSecret), nil
 	}
+
 	return func(c *gin.Context) {
 
 		const BearerSchema = "Bearer "
