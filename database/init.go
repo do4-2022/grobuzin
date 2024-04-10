@@ -10,12 +10,7 @@ var (
 	models = []interface{}{&User{}}
 )
 
-func Init() *gorm.DB {
-
-	// Code to initialize database connection
-
-	dsn := "host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable TimeZone=Asia/Shanghai"
-
+func Init(dsn string) *gorm.DB {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
 	if err != nil {
