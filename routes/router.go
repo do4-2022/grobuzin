@@ -3,6 +3,7 @@ package routes
 import (
 	"log"
 
+	"github.com/do4-2022/grobuzin/routes/function"
 	"github.com/do4-2022/grobuzin/routes/user"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -16,6 +17,7 @@ func GetRoutes(db *gorm.DB, JWTSecret string) *gin.Engine {
 
 	log.Println("Setting up routes", requireAuthMiddleware)
 
+	function.ConfigureRoutes(router)
 	user.ConfigureRoutes(router, db, JWTSecret)
 
 	return router
