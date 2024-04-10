@@ -9,10 +9,12 @@ import (
 	"github.com/caarlos0/env/v10"
 )
 
+import _ "github.com/joho/godotenv/autoload"
+
 type Config struct {
 	// rootFsStorageDSN string `env:"ROOT_FS_STORAGE_DSN,notEmpty"`
 	// VMStorageDSN string `env:"VM_STORAGE_DSN,notEmpty"`
-	funtionStateStorageDSN string `env:"FUNCTION_STATE_STORAGE_DSN" envDefault:"host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable TimeZone=Asia/Shanghai"`
+	FuntionStateStorageDSN string `env:"FUNCTION_STATE_STORAGE_DSN,notEmpty" envDefault:"host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable TimeZone=Asia/Shanghai"`
 	JWTSecret string `env:"JWT_SECRET,notEmpty"`
 }
 
@@ -22,7 +24,7 @@ func main() {
 		log.Fatalf("%+v\n", err)
 	}
 
-	db := database.Init(cfg.funtionStateStorageDSN)
+	db := database.Init(cfg.FuntionStateStorageDSN)
 	r := routes.GetRoutes(db, cfg.JWTSecret)
 
 	err := r.Run()
@@ -30,5 +32,4 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
 }
