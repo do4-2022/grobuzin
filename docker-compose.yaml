@@ -1,5 +1,5 @@
 services:
-  functionState:
+  VMState:
     image: bitnami/redis:latest
     environment:
       - REDIS_PASSWORD=password
@@ -7,18 +7,18 @@ services:
     ports:
       - 6379:6379
     volumes:
-      - function_data:/bitnami/redis/data
+      - vm_data:/bitnami/redis/data
 
-  VMState:
+  functionState:
     image: bitnami/postgresql:latest
     environment:
-      - POSTGRESQL_PASSWORD=password
-      - POSTGRESQL_DATABASE=VMState
-      - POSTGRESQL_USERNAME=user
+      - POSTGRESQL_PASSWORD=postgres
+      - POSTGRESQL_DATABASE=postgres
+      - POSTGRESQL_USERNAME=postgres
     ports:
       - 5432:5432
     volumes:
-      - vm_data:/bitnami/postgresql/data
+      - function_data:/bitnami/postgresql
 
 
   FNStorage:
