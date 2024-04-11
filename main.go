@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"context"
 
 	"github.com/do4-2022/grobuzin/database"
 	"github.com/do4-2022/grobuzin/routes"
@@ -16,7 +17,7 @@ import (
 
 type Config struct {
 	// rootFsStorageDSN string `env:"ROOT_FS_STORAGE_DSN,notEmpty"`
-	// VMStorageDSN string `env:"VM_STORAGE_DSN,notEmpty"`
+	VMStateURL string `env:"VM_STATE_URL,notEmpty"`
 	FuntionStateStorageDSN string `env:"FUNCTION_STATE_STORAGE_DSN,notEmpty" envDefault:"host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable TimeZone=Asia/Shanghai"`
 	JWTSecret              string `env:"JWT_SECRET,notEmpty"`
 	MinioEndpoint          string `env:"MINIO_ENDPOINT,notEmpty"`
@@ -31,8 +32,13 @@ func main() {
 		log.Fatalf("%+v\n", err)
 	}
 
+	ctx := context.Background()
+
 	db := database.Init(cfg.FuntionStateStorageDSN)
 	r := routes.GetRoutes(db, cfg.JWTSecret, getMinioClient(cfg))
+	redis := database.InitRedis(cfg.VMStateURL)
+	redis.Ping(ctx) // TODO define scheduler struct
+	
 
 	err := r.Run()
 
