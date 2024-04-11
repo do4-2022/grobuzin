@@ -2,10 +2,11 @@ package main
 
 import (
 	"log"
-	"context"
+	// "context"
 
 	"github.com/do4-2022/grobuzin/database"
 	"github.com/do4-2022/grobuzin/routes"
+	// "github.com/do4-2022/grobuzin/scheduler"
 
 	"github.com/caarlos0/env/v10"
 
@@ -32,7 +33,14 @@ func main() {
 		log.Fatalf("%+v\n", err)
 	}
 
-	ctx := context.Background()
+	/*ctx := context.Background()
+	redis := database.InitRedis(cfg.VMStateURL)
+
+	s := &scheduler.Scheduler{
+		RedisHandle: redis, 
+		Context: &ctx,
+	}*/
+	//Now inject the scheduler into the routes that need it! 
 
 	db := database.Init(cfg.FuntionStateStorageDSN)
 	r := routes.GetRoutes(db, cfg.JWTSecret, getMinioClient(cfg))
