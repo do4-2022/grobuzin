@@ -19,7 +19,7 @@ import (
 
 type Config struct {
 	// rootFsStorageDSN string `env:"ROOT_FS_STORAGE_DSN,notEmpty"`
-	VMStateURL string `env:"VM_STATE_URL,notEmpty"`
+	VMStateURL             string `env:"VM_STATE_URL,notEmpty"`
 	FuntionStateStorageDSN string `env:"FUNCTION_STATE_STORAGE_DSN,notEmpty" envDefault:"host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable TimeZone=Asia/Shanghai"`
 	JWTSecret              string `env:"JWT_SECRET,notEmpty"`
 	BuilderEndpoint        string `env:"BUILDER_ENDPOINT,notEmpty"`
@@ -39,19 +39,19 @@ func main() {
 	redis := database.InitRedis(cfg.VMStateURL)
 
 	s := &scheduler.Scheduler{
-		Redis: redis, 
+		Redis:   redis,
 		Context: &ctx,
 	}
-	//Now inject the scheduler into the routes that need it! 
+	//Now inject the scheduler into the routes that need it!
 
-	go func() { 
-		// every 24 hours we check for 
-		for { 
-			time.Sleep(time.Hour * 6);
-			
+	go func() {
+		// every 24 hours we check for
+		for {
+			time.Sleep(time.Hour * 6)
+
 			log.Println("Ran instance pruning at", time.Now().UTC())
-			s.FindAndDestroyUnsused(24);	
-		} 
+			s.FindAndDestroyUnsused(24)
+		}
 	}()
 
 	db := database.Init(cfg.FuntionStateStorageDSN)
