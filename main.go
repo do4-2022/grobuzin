@@ -2,7 +2,7 @@ package main
 
 import (
 	"log"
-	// "context"
+	"context"
 
 	"github.com/do4-2022/grobuzin/database"
 	"github.com/do4-2022/grobuzin/routes"
@@ -33,7 +33,9 @@ func main() {
 		log.Fatalf("%+v\n", err)
 	}
 
-	/*ctx := context.Background()
+	ctx := context.Background()
+
+	/*
 	redis := database.InitRedis(cfg.VMStateURL)
 
 	s := &scheduler.Scheduler{
