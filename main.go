@@ -22,6 +22,7 @@ type Config struct {
 	VMStateURL string `env:"VM_STATE_URL,notEmpty"`
 	FuntionStateStorageDSN string `env:"FUNCTION_STATE_STORAGE_DSN,notEmpty" envDefault:"host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable TimeZone=Asia/Shanghai"`
 	JWTSecret              string `env:"JWT_SECRET,notEmpty"`
+	BuilderEndpoint        string `env:"BUILDER_ENDPOINT,notEmpty"`
 	MinioEndpoint          string `env:"MINIO_ENDPOINT,notEmpty"`
 	MinioAccessKey         string `env:"MINIO_ACCESS_KEY,notEmpty"`
 	MinioSecretKey         string `env:"MINIO_SECRET_KEY,notEmpty"`
@@ -54,7 +55,7 @@ func main() {
 	}()
 
 	db := database.Init(cfg.FuntionStateStorageDSN)
-	r := routes.GetRoutes(db, cfg.JWTSecret, getMinioClient(cfg))
+	r := routes.GetRoutes(db, cfg.JWTSecret, cfg.BuilderEndpoint, getMinioClient(cfg))
 
 	err := r.Run()
 
