@@ -36,7 +36,7 @@ func (service *CodeStorageService) Init() {
 		log.Printf("Successfully created %s\n", bucketName)
 	}
 }
-func (service *CodeStorageService) PutCode(id uuid.UUID, files map[string]interface{}) {
+func (service *CodeStorageService) PutCode(id uuid.UUID, files map[string]string) {
 
 	contentType := "application/json"
 	ctx := context.Background()
@@ -55,7 +55,7 @@ func (service *CodeStorageService) PutCode(id uuid.UUID, files map[string]interf
 	}
 }
 
-func (service *CodeStorageService) GetCode(id uuid.UUID) (map[string]interface{}, error) {
+func (service *CodeStorageService) GetCode(id uuid.UUID) (map[string]string, error) {
 	ctx := context.Background()
 	filePath := id.String() + codeFileSuffix
 
@@ -70,7 +70,7 @@ func (service *CodeStorageService) GetCode(id uuid.UUID) (map[string]interface{}
 		return nil, err
 	}
 
-	files := make(map[string]interface{})
+	files := make(map[string]string)
 	err = json.Unmarshal(buf.Bytes(), &files)
 	if err != nil {
 		return nil, err

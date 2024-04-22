@@ -1,6 +1,11 @@
 package function
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/do4-2022/grobuzin/database"
@@ -13,6 +18,7 @@ import (
 type Controller struct {
 	CodeStorageService *objectStorage.CodeStorageService
 	DB                 *gorm.DB
+	BuilderEndpoint    string
 }
 
 func (cont *Controller) GetAllFunction(c *gin.Context) {
@@ -70,6 +76,11 @@ func (cont *Controller) PostFunction(c *gin.Context) {
 	cont.DB.Create(&function)
 
 	cont.CodeStorageService.PutCode(id, dto.Files)
+	err := cont.buildImage(dto.Language, dto.Files)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Unable to build image!"})
+		return
+	}
 
 	c.JSON(http.StatusOK, function)
 }
@@ -92,6 +103,11 @@ func (cont *Controller) PutFunction(c *gin.Context) {
 	cont.DB.Save(function)
 
 	cont.CodeStorageService.PutCode(uuid, json.Files)
+	err := cont.buildImage(json.Language, json.Files)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Unable to build image!"})
+		return
+	}
 
 	c.JSON(http.StatusOK, function)
 }
@@ -107,4 +123,39 @@ func (cont *Controller) DeleteFunction(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusNoContent, nil)
+}
+
+func (cont *Controller) buildImage(variant string, files map[string]string) error {
+	request := BuilderRequest{
+		Variant: variant,
+		Files:   files,
+	}
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+
+	url := cont.BuilderEndpoint + "/build"
+	response, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Printf("The HTTP request failed with error %s\n", err)
+		return nil
+	}
+	defer response.Body.Close()
+
+	contentBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+	if response.StatusCode != http.StatusOK {
+		fmt.Printf("The HTTP request failed with status code %d\n error: %s", response.StatusCode, contentBody)
+		return errors.New("failed to build image")
+	}
+	return nil
+}
+
+type BuilderRequest struct {
+	Files   map[string]string `json:"files"`
+	Variant string            `json:"variant"`
 }

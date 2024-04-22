@@ -7,14 +7,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func ConfigureRoutes(router *gin.Engine, db *gorm.DB, minioClient *minio.Client) {
+func ConfigureRoutes(router *gin.Engine, db *gorm.DB, minioClient *minio.Client, builderEndpoint string) {
 
 	group := router.Group("/function")
 
 	codeStorageService := objectStorage.CodeStorageService{MinioClient: minioClient}
 	codeStorageService.Init()
 
-	controller := Controller{&codeStorageService, db}
+	controller := Controller{&codeStorageService, db, builderEndpoint}
 
 	group.POST("/", controller.PostFunction)
 	group.GET("/", controller.GetAllFunction)
