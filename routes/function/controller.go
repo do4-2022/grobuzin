@@ -1,6 +1,9 @@
 package function
 
 import (
+	"bytes"
+	"context"
+	"log"
 	"net/http"
 
 	"github.com/do4-2022/grobuzin/database"
@@ -55,6 +58,16 @@ func (cont *Controller) PostFunction(c *gin.Context) {
 		Language:    json.Language,
 	}
 	cont.DB.Create(&function)
+
+	contentType := "text/plain"
+	ctx := context.Background()
+	bucketName := "functions"
+
+	reader := bytes.NewReader([]byte(json.Code))
+	_, err := cont.minioClient.PutObject(ctx, bucketName, id.String(), reader, -1, minio.PutObjectOptions{ContentType: contentType})
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	c.JSON(http.StatusOK, function)
 }
