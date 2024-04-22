@@ -1,21 +1,18 @@
 package function
 
 import (
-	"bytes"
-	"context"
-	"log"
 	"net/http"
 
 	"github.com/do4-2022/grobuzin/database"
+	"github.com/do4-2022/grobuzin/objectStorage"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/minio/minio-go/v7"
 	"gorm.io/gorm"
 )
 
 type Controller struct {
-	minioClient *minio.Client
-	DB          *gorm.DB
+	CodeStorageService *objectStorage.CodeStorageService
+	DB                 *gorm.DB
 }
 
 func (cont *Controller) GetAllFunction(c *gin.Context) {
@@ -40,34 +37,39 @@ func (cont *Controller) GetOneFunction(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, function)
+	files, err := cont.CodeStorageService.GetCode(uuid.MustParse(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Code not found!"})
+		return
+	}
+
+	dto := FunctionDTO{
+		Name:        function.Name,
+		Description: function.Description,
+		Language:    function.Language,
+		Files:       files,
+	}
+
+	c.JSON(http.StatusOK, dto)
 }
 
 func (cont *Controller) PostFunction(c *gin.Context) {
 	id := uuid.New()
-	var json FunctionDTO
-	if err := c.ShouldBindJSON(&json); err != nil {
+	var dto FunctionDTO
+	if err := c.ShouldBindJSON(&dto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	var function = database.Function{
 		ID:          id,
-		Name:        json.Name,
-		Description: json.Description,
-		Language:    json.Language,
+		Name:        dto.Name,
+		Description: dto.Description,
+		Language:    dto.Language,
 	}
 	cont.DB.Create(&function)
 
-	contentType := "text/plain"
-	ctx := context.Background()
-	bucketName := "functions"
-
-	reader := bytes.NewReader([]byte(json.Code))
-	_, err := cont.minioClient.PutObject(ctx, bucketName, id.String(), reader, -1, minio.PutObjectOptions{ContentType: contentType})
-	if err != nil {
-		log.Fatalln(err)
-	}
+	cont.CodeStorageService.PutCode(id, dto.Files)
 
 	c.JSON(http.StatusOK, function)
 }
@@ -89,6 +91,8 @@ func (cont *Controller) PutFunction(c *gin.Context) {
 
 	cont.DB.Save(function)
 
+	cont.CodeStorageService.PutCode(uuid, json.Files)
+
 	c.JSON(http.StatusOK, function)
 }
 
@@ -96,6 +100,11 @@ func (cont *Controller) DeleteFunction(c *gin.Context) {
 	var uuid uuid.UUID = uuid.MustParse(c.Param("id"))
 
 	cont.DB.Delete(&database.Function{ID: uuid})
+	err := cont.CodeStorageService.DeleteCode(uuid)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Unable not delete code!"})
+		return
+	}
 
 	c.JSON(http.StatusNoContent, nil)
 }
