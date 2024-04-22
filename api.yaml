@@ -154,8 +154,10 @@ components:
           type: string
         language:
           type: string
-        code:
-          type: string
+        files:
+          type: object
+          additionalProperties:
+            type: string
     functionInfo:
       type: object
       properties:
