@@ -60,13 +60,13 @@ func (s *Scheduler) LookForReadyInstance(functionId uuid.UUID, cursor uint64) (i
 } 
 
 func (s *Scheduler) SpawnVM(functionId uuid.UUID) (LambdoRunResponse, err error) {
-	res, err := s.Lambdo.RunFunction("lorem ipsum dolor sit amet") // TODO change this when available
+	res, err := s.Lambdo.SpawnVM(functionId)
 
 	if (err != nil) {
 		return
 	}
 
-	locationID := fmt.Sprintf(functionId.String(), ":", uuid.New().String())
+	locationID := fmt.Sprintf(functionId.String(), ":", res.ID)
 	
 	err = s.Redis.HSet(*s.Context, locationID, &FunctionLocation{ 
 		Address: res.Address, 
