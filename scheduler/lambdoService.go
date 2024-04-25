@@ -1,6 +1,10 @@
 package scheduler
 
 import (
+	"fmt"
+
+	"github.com/google/uuid"
+
 	"bytes"
 	"encoding/json"
 	"io"
@@ -8,30 +12,21 @@ import (
 )
 
 type LambdoService struct {
-	URL string
+	URL 		string
+	MinioURL 	string
 }
 
-type LambdoCodeFileItem struct {
-	Filename string `json:"filename"`
-	Content string `json:"content"`
+type LambdoSpawnRequest struct {
+	RootfsURL string `json:"rootfs"`
 }
 
-type LambdoRunRequest struct {
-	Language string `json:"language"`
-	Version string `json:"version"`
-	Input string `json:"input"`
-	Code []LambdoCodeFileItem `json:"code"`
+type LambdoSpawnResponse struct {
+	ID		string	`json:"ID"`
+	Port	uint16 	`json:"port"`
+	Address string	`json:"address"`
 }
 
-type LambdoRunResponse struct {
-	Status 	int		`json:"status"`
-	Stdout 	string 	`json:"stdout"`
-	Stderr 	string 	`json:"stderr"`
-	Port   	uint16 	`json:"port"`    ////
-	Address string	`json:"address"` //// Should be added by Simon 
-}
-
-func (service *LambdoService) RunFunction(code string) (data LambdoRunResponse, err error) {
+func (service *LambdoService) SpawnVM(function_id uuid.UUID) (data LambdoSpawnResponse, err error) {
 	var res *http.Response
 	defer func() {
 		if res != nil {
@@ -39,23 +34,19 @@ func (service *LambdoService) RunFunction(code string) (data LambdoRunResponse, 
 		}
 	}()
 
-	body, err := json.Marshal(&LambdoRunRequest{
-		Language: "NODE", // TODO
-		Version: "1.0.0",
-		Input: "",
-		Code: []LambdoCodeFileItem{
-			{
-				Filename: "index.js",
-				Content: code,
-			},
-		},
+	body, err := json.Marshal(&LambdoSpawnRequest{
+		RootfsURL: fmt.Sprintf("%s/%s", service.MinioURL, function_id),
 	})
 
 	if err != nil {
 		return 
 	}
 
-	res, err = http.Post(service.URL, "application/json", bytes.NewReader(body))
+	res, err = http.Post(
+		fmt.Sprintf(service.URL, "/spawn"), 
+		"application/json", 
+		bytes.NewReader(body),
+	)
 
 	if err != nil {
 		return
@@ -67,8 +58,17 @@ func (service *LambdoService) RunFunction(code string) (data LambdoRunResponse, 
 		return 
 	}
 	
-	data = LambdoRunResponse{}
 	err = json.Unmarshal(bytes, &data)
+
+	return 
+}
+
+func (service *LambdoService) DeleteVM(VMID string) (err error) {
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf(service.URL, "/destroy/", VMID ), nil)
+	if err != nil {
+		return
+	}
+	_, err = http.DefaultClient.Do(req)
 
 	return
 }
