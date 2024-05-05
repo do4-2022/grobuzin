@@ -1,12 +1,13 @@
 package main
 
 import (
-	"log"
 	"context"
+	"log"
+	"time"
 
 	"github.com/do4-2022/grobuzin/database"
 	"github.com/do4-2022/grobuzin/routes"
-	// "github.com/do4-2022/grobuzin/scheduler"
+	"github.com/do4-2022/grobuzin/scheduler"
 
 	"github.com/caarlos0/env/v10"
 
@@ -34,21 +35,26 @@ func main() {
 	}
 
 	ctx := context.Background()
-
-	/*
 	redis := database.InitRedis(cfg.VMStateURL)
 
 	s := &scheduler.Scheduler{
-		RedisHandle: redis, 
+		Redis: redis, 
 		Context: &ctx,
-	}*/
+	}
 	//Now inject the scheduler into the routes that need it! 
+
+	go func() { 
+		// every 24 hours we check for 
+		for { 
+			time.Sleep(time.Hour * 6);
+			
+			log.Println("Ran instance pruning at", time.Now().UTC())
+			s.FindAndDestroyUnsused(24);	
+		} 
+	}()
 
 	db := database.Init(cfg.FuntionStateStorageDSN)
 	r := routes.GetRoutes(db, cfg.JWTSecret, getMinioClient(cfg))
-	redis := database.InitRedis(cfg.VMStateURL)
-	redis.Ping(ctx) // TODO define scheduler struct
-	
 
 	err := r.Run()
 

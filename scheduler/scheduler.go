@@ -1,9 +1,10 @@
 package scheduler
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -18,6 +19,9 @@ const (
 	Unknown
 )
 
+// This struct represents an instance of a function, especially it's address and status 
+// Each key in the redis is namespaced as it follows:
+// <id of the function>:<id of the instance>
 type FunctionLocation struct {
 	Address 	string		`redis:"address"`
 	Port    	uint16		`redis:"port"`
@@ -34,6 +38,7 @@ type Scheduler struct {
 
 // Uses SCAN to look for the first instance marked as ready (https://redis.io/docs/latest/commands/scan/)
 func (s *Scheduler) LookForReadyInstance(functionId uuid.UUID, cursor uint64) (id string, returnedCursor uint64, err error) {
+	// match rule to get all instances of a function 
 	locationMatch := fmt.Sprintf(functionId.String(), ":*")
 
 	keys, returnedCursor, err := s.Redis.Scan(*s.Context, cursor, locationMatch, 10).Result()
@@ -80,13 +85,16 @@ func (s *Scheduler) SpawnVM(functionId uuid.UUID) (LambdoRunResponse, err error)
 
 func (s *Scheduler) GetFunctionLocations(functionId uuid.UUID) (locations []FunctionLocation) {
 	locationQuery := fmt.Sprintf(functionId.String(), ":*")
+	firstsweep, cursor := true, uint64(0)
+	
+	// because do-while does not exists in these lands
+	for !firstsweep && cursor != 0 {
+		firstsweep = false
 
-
-	// because while does not exists in these lands
-	for ok, cursor := true, uint64(0) ; ok; ok = (cursor != 0) {
 		var keys []string 
 		keys, cursor = s.Redis.Scan(*s.Context, cursor, locationQuery, 10).Val()
 		
+		// for each key we got, we retrieve all of it's information
 		for _, ID := range keys {
 			var location FunctionLocation
 			
@@ -99,4 +107,36 @@ func (s *Scheduler) GetFunctionLocations(functionId uuid.UUID) (locations []Func
 	}
 
 	return 
+}
+
+// goes through the whole redis instance and remove that have not been used within the last {hoursTimeout} Hours
+func (s *Scheduler) FindAndDestroyUnsused(hoursTimeout float64) {
+	now := time.Now()
+	keys, cursor := s.Redis.Scan(*s.Context, 0, "*", 10).Val()
+
+	for cursor != 0 {
+		for _, ID := range keys {
+			val, err := s.Redis.HGet(*s.Context, ID, "lastUsed").Result()
+
+			if err != nil {
+				continue
+			}
+
+			// if it was never used we delete this
+			if val == "never"  {
+				if s.Lambdo.DeleteVM(ID) != nil {
+					s.Redis.Del(*s.Context, ID)
+				}
+			} else {
+				// if it hasn't been used for {hoursTimeout} we delete it
+				lastUsed, err := time.Parse(time.UnixDate, val)
+				if err != nil || now.Sub(lastUsed).Abs().Hours() >= hoursTimeout {
+					if s.Lambdo.DeleteVM(ID) != nil {
+						s.Redis.Del(*s.Context, ID)
+					}
+				}
+			}
+		}
+		keys, cursor = s.Redis.Scan(*s.Context, cursor, "*", 10).Val()
+	}
 }
