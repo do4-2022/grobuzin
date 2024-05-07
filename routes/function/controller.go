@@ -118,7 +118,12 @@ func (cont *Controller) DeleteFunction(c *gin.Context) {
 	cont.DB.Delete(&database.Function{ID: uuid})
 	err := cont.CodeStorageService.DeleteCode(uuid)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Unable not delete code!"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Unable to delete code!"})
+		return
+	}
+	err = cont.CodeStorageService.DeleteRootFs(uuid)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Unable to delete rootfs!"})
 		return
 	}
 
