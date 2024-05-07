@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 
 	"github.com/google/uuid"
@@ -82,6 +83,20 @@ func (service *CodeStorageService) GetCode(id uuid.UUID) (map[string]string, err
 func (service *CodeStorageService) DeleteCode(id uuid.UUID) error {
 	ctx := context.Background()
 	filePath := id.String() + codeFileSuffix
+
+	err := service.MinioClient.RemoveObject(ctx, bucketName, filePath, minio.RemoveObjectOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// delete rootfs from object storage
+func (service *CodeStorageService) DeleteRootFs(id uuid.UUID) error {
+	ctx := context.Background()
+	
+	filePath := fmt.Sprintf("function/%s/rootfs.ext4", id)
 
 	err := service.MinioClient.RemoveObject(ctx, bucketName, filePath, minio.RemoveObjectOptions{})
 	if err != nil {
