@@ -9,4 +9,5 @@ type Function struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Language    string    `json:"language"`
+	Built       bool      `json:"built"` // The builder has built the image for this function
 }
