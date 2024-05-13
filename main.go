@@ -55,7 +55,7 @@ func main() {
 	}()
 
 	db := database.Init(cfg.FuntionStateStorageDSN)
-	r := routes.GetRoutes(db, cfg.JWTSecret, cfg.BuilderEndpoint, getMinioClient(cfg))
+	r := routes.GetRoutes(db, cfg.JWTSecret, cfg.BuilderEndpoint, getMinioClient(cfg), *s)
 
 	err := r.Run()
 

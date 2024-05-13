@@ -7,20 +7,23 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"time"
 	"net/http"
+	"time"
 
 	"github.com/do4-2022/grobuzin/database"
 	"github.com/do4-2022/grobuzin/objectStorage"
+	"github.com/do4-2022/grobuzin/scheduler"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Controller struct {
 	CodeStorageService *objectStorage.CodeStorageService
 	DB                 *gorm.DB
 	BuilderEndpoint    string
+	Scheduler          *scheduler.Scheduler
 }
 
 func (cont *Controller) GetAllFunction(c *gin.Context) {
@@ -172,54 +175,105 @@ type BuilderRequest struct {
 
 func (c *Controller) RunFunction(ctx *gin.Context) {
     fnID, err := uuid.Parse(ctx.Param("id"))
-	
-	//var fnBody any; // because the body is entirely defined by the user, we just forward it to the function without checking it
 
 	if err != nil {
 		ctx.AbortWithStatusJSON(400, gin.H{"error": "Invalid function ID"})
 		return
 	}
 
-	var fn database.FunctionState
-	err = c.DB.Where(&database.FunctionState{FunctionID: fnID}).First(&fn).Error
+	var fn database.Function
+	var fnState database.FunctionState
+	
+	fnBody, err := io.ReadAll(ctx.Request.Body); // because the body is entirely defined by the user, we just forward it to the function without checking it
+
+	if err != nil {
+		ctx.AbortWithStatusJSON(400, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	// does the function exist?
+	err = c.DB.Where(&database.Function{ID: fnID}).First(&fn).Error
 
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 		ctx.AbortWithStatusJSON(404, gin.H{"error": "Function not found"})
 		return
 	}
 
-	if fn.Status != "Ready" {
+	// does the function have an instance?
+	err = c.DB.Where(&database.FunctionState{FunctionID: fnID}).First(&fnState).Error
+
+	// if the function does not have an instance, we create ask the scheduler to create one
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		res, err := c.Scheduler.SpawnVM(fnID)
+
+		if err != nil {
+			ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
+			return
+		}
+
+		fnState = database.FunctionState{
+			FunctionID: fnID,
+			Status:     "Creating",
+			Address:    res.Address,
+			Port:       res.Port,
+		}
+
+		err = c.DB.Clauses(clause.Returning{}).Create(&fnState).Error
+
+		if err != nil {
+			ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
+			return
+		}
+
+	}
+
+	if fnState.Status != "Ready" {
 		log.Println("Waiting for function", fn.ID, "to be ready")
 		time.Sleep(100 * time.Millisecond)
 
+
+		// we will try 5 times to find a ready function instance
 		for attempts := 0; attempts < 5; attempts++ {
+			// we are looking for a ready instance
 			err = c.DB.Where(&database.FunctionState{FunctionID: fnID, Status: "Ready"}).First(&fn).Error
 
-			if !errors.Is(err, gorm.ErrRecordNotFound) {
+			// if the error is something else than a record not found, we return an error, else we retry since it is not ready yet
+			if !errors.Is(err, gorm.ErrRecordNotFound) { 
 				log.Println(err)
 				ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
 				return
-			} else {
-				log.Println("Function", fn.FunctionID, "is not ready yet... Retrying")
+			} else { 
+				log.Println("Function", fnID, "is not ready yet... Retrying")
 
 				time.Sleep(100 * time.Millisecond)
 			}
 
-			if fn.Status == "Ready" { 
-				log.Println("Function", fn.FunctionID, "is ready")
+			if fnState.Status == "Ready" { 
+				log.Println("Function", fnID, "is ready")
 
 				break 
 			};
 
 		}
 
-		if fn.Status != "Ready" {
+		// if even after 5 attempts the function is not ready, we return an error
+		if fnState.Status != "Ready" {
 			ctx.AbortWithStatusJSON(500, gin.H{"error": "Function is not ready"})
 			return
 		}
 	}
 
-	// TODO: forward the body to fn.Address:fn.Port
-	ctx.JSON(200, fn)
+	
+	_, err = http.Post(
+		fmt.Sprint("http://", string(fnState.Address), ":", fnState.Port, "/execute"),
+		"application/json",
+		bytes.NewReader(fnBody),
+	)
+
+	if err != nil {
+		ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})	
+	} else {
+		ctx.Status(204)
+	}
 }
 
