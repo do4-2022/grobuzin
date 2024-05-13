@@ -64,7 +64,7 @@ func (s *Scheduler) LookForReadyInstance(functionId uuid.UUID, cursor uint64) (i
 	return "", 0, errors.New("could not find an available function")  // we did not find anything thus, id is empty
 } 
 
-func (s *Scheduler) SpawnVM(functionId uuid.UUID) (LambdoRunResponse, err error) {
+func (s *Scheduler) SpawnVM(functionId uuid.UUID) (LambdoRunResponse LambdoSpawnResponse, err error) {
 	res, err := s.Lambdo.SpawnVM(functionId)
 
 	if (err != nil) {
