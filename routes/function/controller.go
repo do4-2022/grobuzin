@@ -76,7 +76,7 @@ func (cont *Controller) PostFunction(c *gin.Context) {
 	cont.DB.Create(&function)
 
 	cont.CodeStorageService.PutCode(id, dto.Files)
-	err := cont.buildImage(dto.Language, dto.Files)
+	err := cont.buildImage(id.String(), dto.Language, dto.Files)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Unable to build image!"})
 		return
@@ -103,7 +103,7 @@ func (cont *Controller) PutFunction(c *gin.Context) {
 	cont.DB.Save(function)
 
 	cont.CodeStorageService.PutCode(uuid, json.Files)
-	err := cont.buildImage(json.Language, json.Files)
+	err := cont.buildImage(uuid.String(), json.Language, json.Files)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Unable to build image!"})
 		return
@@ -130,8 +130,10 @@ func (cont *Controller) DeleteFunction(c *gin.Context) {
 	c.JSON(http.StatusNoContent, nil)
 }
 
-func (cont *Controller) buildImage(variant string, files map[string]string) error {
+func (cont *Controller) buildImage(id string, variant string, files map[string]string) error {
 	request := BuilderRequest{
+		Id: id,
+
 		Variant: variant,
 		Files:   files,
 	}
@@ -161,6 +163,7 @@ func (cont *Controller) buildImage(variant string, files map[string]string) erro
 }
 
 type BuilderRequest struct {
+	Id      string            `json:"id"`
 	Files   map[string]string `json:"files"`
 	Variant string            `json:"variant"`
 }
