@@ -16,7 +16,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type Controller struct {
@@ -200,10 +199,10 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 	}
 
 	// does the function have an instance?
-	err = c.DB.Where(&database.FunctionState{FunctionID: fnID}).First(&fnState).Error
+	fnState, _, err = c.Scheduler.LookForReadyInstance(fnID, 0)
 
 	// if the function does not have an instance, we create ask the scheduler to create one
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if errors.Is(err, scheduler.ErrRecordNotFound) {
 		res, err := c.Scheduler.SpawnVM(fnID)
 
 		if err != nil {
@@ -211,53 +210,44 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 			return
 		}
 
-		fnState = database.FunctionState{
-			FunctionID: fnID,
-			Status:     "Creating",
-			Address:    res.Address,
-			Port:       res.Port,
-		}
-
-		err = c.DB.Clauses(clause.Returning{}).Create(&fnState).Error
+		fnState, err = c.Scheduler.GetStateByID(
+			fmt.Sprintf(fnID.String(), ":", res.ID),
+		)
 
 		if err != nil {
-			ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
 			return
-		}
-
+		} 
 	}
 
-	if fnState.Status != "Ready" {
+	if err != nil {
+		return
+	}
+
+
+	if fnState.Status != database.FnReady {
 		log.Println("Waiting for function", fn.ID, "to be ready")
 		time.Sleep(100 * time.Millisecond)
 
 
-		// we will try 5 times to find a ready function instance
+		// we will try 5 times to check if the instance is ready
 		for attempts := 0; attempts < 5; attempts++ {
-			// we are looking for a ready instance
-			err = c.DB.Where(&database.FunctionState{FunctionID: fnID, Status: "Ready"}).First(&fn).Error
+			// we check if it is ready
+			fnState, err := c.Scheduler.GetStateByID(fmt.Sprintf(fnID.String(), ":", fnState.ID))
 
 			// if the error is something else than a record not found, we return an error, else we retry since it is not ready yet
-			if !errors.Is(err, gorm.ErrRecordNotFound) { 
-				log.Println(err)
+			if err != nil { 
 				ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
 				return
-			} else { 
-				log.Println("Function", fnID, "is not ready yet... Retrying")
-
-				time.Sleep(100 * time.Millisecond)
 			}
 
-			if fnState.Status == "Ready" { 
+			if fnState.Status == database.FnReady { 
 				log.Println("Function", fnID, "is ready")
-
 				break 
 			};
-
 		}
 
 		// if even after 5 attempts the function is not ready, we return an error
-		if fnState.Status != "Ready" {
+		if fnState.Status != database.FnReady {
 			ctx.AbortWithStatusJSON(500, gin.H{"error": "Function is not ready"})
 			return
 		}
