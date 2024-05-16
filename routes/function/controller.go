@@ -223,6 +223,7 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 		return
 	}
 
+	stateID := fmt.Sprintf(fnID.String(), ":", fnState.ID)
 
 	if fnState.Status != database.FnReady {
 		log.Println("Waiting for function", fn.ID, "to be ready")
@@ -232,7 +233,7 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 		// we will try 5 times to check if the instance is ready
 		for attempts := 0; attempts < 5; attempts++ {
 			// we check if it is ready
-			fnState, err := c.Scheduler.GetStateByID(fmt.Sprintf(fnID.String(), ":", fnState.ID))
+			fnState, err := c.Scheduler.GetStateByID(stateID)
 
 			// if the error is something else than a record not found, we return an error, else we retry since it is not ready yet
 			if err != nil { 
@@ -253,6 +254,13 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 		}
 	}
 
+	err = c.Scheduler.SetStatus(stateID, database.FnRunning)
+
+	if err != nil {
+		log.Println(err.Error())
+		ctx.AbortWithStatusJSON(500, gin.H{"error": "Cannot update function's status"})
+		return
+	}
 	
 	_, err = http.Post(
 		fmt.Sprint("http://", string(fnState.Address), ":", fnState.Port, "/execute"),
@@ -262,8 +270,16 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 
 	if err != nil {
 		ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})	
+		_ = c.Scheduler.SetStatus(stateID, database.FnUnknownState)
+		return
 	} else {
 		ctx.Status(204)
+	}
+
+	err = c.Scheduler.SetStatus(stateID, database.FnReady)
+
+	if err != nil {
+		log.Println(err.Error())
 	}
 }
 

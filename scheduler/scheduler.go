@@ -29,6 +29,15 @@ func (s *Scheduler) GetStateByID(id string) (fnState database.FunctionState, err
 	return
 }
 
+func (s *Scheduler) SetStatus(id string, status database.FnStatusCode) error {
+	return s.Redis.HSet(
+		*s.Context,
+		id,
+		"status",
+		status,
+	).Err()
+}
+
 // Uses SCAN to look for the first instance marked as ready (https://redis.io/docs/latest/commands/scan/)
 func (s *Scheduler) LookForReadyInstance(functionId uuid.UUID, cursor uint64) (fnState database.FunctionState, returnedCursor uint64, err error) {
 	// match rule to get all instances of a function 
@@ -57,7 +66,7 @@ func (s *Scheduler) LookForReadyInstance(functionId uuid.UUID, cursor uint64) (f
 	return fnState, 0, ErrRecordNotFound  // we did not find anything thus, id is empty
 } 
 
-func (s *Scheduler) SpawnVM(functionId uuid.UUID) (LambdoRunResponse LambdoSpawnResponse, err error) {
+func (s *Scheduler) SpawnVM(functionId uuid.UUID) (fnState database.FunctionState, err error) {
 	res, err := s.Lambdo.SpawnVM(functionId)
 
 	if (err != nil) {
@@ -65,42 +74,18 @@ func (s *Scheduler) SpawnVM(functionId uuid.UUID) (LambdoRunResponse LambdoSpawn
 	}
 
 	stateID := fmt.Sprintf(functionId.String(), ":", res.ID)
-	
-	err = s.Redis.HSet(*s.Context, stateID, &database.FunctionState{ 
+
+	fnState = database.FunctionState{ 
 		ID: res.ID,
-		Address: res.Address, 
-		Port: res.Port,
-		Status: database.FnCreating,
+		Address: s.Lambdo.URL, 
+		Port: res.Ports[0],
+		Status: database.FnReady,
 		LastUsed: "never",
-	}).Err()
-	
-	return
-}
-
-func (s *Scheduler) GetFunctionStates(functionId uuid.UUID) (states []database.FunctionState) {
-	stateQuery := fmt.Sprintf(functionId.String(), ":*")
-	firstsweep, cursor := true, uint64(0)
-	
-	// because do-while does not exists in these lands
-	for !firstsweep && cursor != 0 {
-		firstsweep = false
-
-		var keys []string 
-		keys, cursor = s.Redis.Scan(*s.Context, cursor, stateQuery, 10).Val()
-		
-		// for each key we got, we retrieve all of it's information
-		for _, ID := range keys {
-			var state database.FunctionState
-			
-			if s.Redis.HGetAll(*s.Context, ID).Scan(&state) != nil {
-				return
-			}
-
-			states = append(states, state)
-		}
 	}
 
-	return 
+	err = s.Redis.HSet(*s.Context, stateID, fnState).Err()
+	
+	return
 }
 
 // goes through the whole redis instance and remove that have not been used within the last {hoursTimeout} Hours
