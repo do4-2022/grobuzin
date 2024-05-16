@@ -1,20 +1,21 @@
 package database
 
-import (
-	"github.com/google/uuid"
-	"gorm.io/gorm"
+type FnStatusCode int
+
+const (
+	FnCreating FnStatusCode = iota
+	FnReady
+	FnRunning
+	FnUnknownState
 )
 
+// This struct represents an instance of a function, especially it's address and status 
+// Each key in the redis is namespaced as it follows:
+// <id of the function>:<id of the instance>
 type FunctionState struct {
-	gorm.Model
-	ID      uuid.UUID `json:"id" ,gorm:"primarykey;type:uuid;default:gen_random_uuid()"`
-	Status  string    `json:"status"`
-	Address string    `json:"address"`
-	Port    uint16    `json:"port"`
-
-	FunctionID uuid.UUID `json:"function_id"`
-}
-
-func (FunctionState) TableName() string {
-	return "function_states"
+	ID			string			`redis:"address"`
+	Address 	string			`redis:"address"`
+	Port    	uint16			`redis:"port"`
+	Status 		FnStatusCode 	`redis:"status"`
+	LastUsed	string			`redis:"lastUsed"`
 }

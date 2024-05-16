@@ -5,30 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"github.com/do4-2022/grobuzin/database"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
-type StatusCode int
-
-const (
-	Creating StatusCode = iota
-	Ready
-	Running
-	Unknown
-)
-
-// This struct represents an instance of a function, especially it's address and status 
-// Each key in the redis is namespaced as it follows:
-// <id of the function>:<id of the instance>
-type FunctionLocation struct {
-	Address 	string		`redis:"address"`
-	Port    	uint16		`redis:"port"`
-	Status 		StatusCode 	`redis:"status"`
-	LastUsed	string		`redis:"lastUsed"`
-}
-
+var ErrRecordNotFound = errors.New("could not find an available function")
 
 type Scheduler struct {
 	Redis *redis.Client
@@ -36,23 +19,33 @@ type Scheduler struct {
 	Lambdo *LambdoService
 }
 
-// Uses SCAN to look for the first instance marked as ready (https://redis.io/docs/latest/commands/scan/)
-func (s *Scheduler) LookForReadyInstance(functionId uuid.UUID, cursor uint64) (id string, returnedCursor uint64, err error) {
-	// match rule to get all instances of a function 
-	locationMatch := fmt.Sprintf(functionId.String(), ":*")
+// Get all keys of a state by its ID 
+func (s *Scheduler) GetStateByID(id string) (fnState database.FunctionState, err error) {
+	err = s.Redis.HGetAll(
+		*s.Context,
+		id,
+	).Scan(&fnState)
 
-	keys, returnedCursor, err := s.Redis.Scan(*s.Context, cursor, locationMatch, 10).Result()
+	return
+}
+
+// Uses SCAN to look for the first instance marked as ready (https://redis.io/docs/latest/commands/scan/)
+func (s *Scheduler) LookForReadyInstance(functionId uuid.UUID, cursor uint64) (fnState database.FunctionState, returnedCursor uint64, err error) {
+	// match rule to get all instances of a function 
+	stateMatch := fmt.Sprintf(functionId.String(), ":*")
+
+	keys, returnedCursor, err := s.Redis.Scan(*s.Context, cursor, stateMatch, 10).Result()
 
 	if err != nil {
 		return
 	}
 
 	for _, id := range keys {
-		code, err := s.Redis.HGet(*s.Context, id, "status").Int();
+		err := s.Redis.HGetAll(*s.Context, id).Scan(&fnState);
 
-		if err != nil && StatusCode(code) == Ready {
+		if err == nil && database.FnStatusCode(fnState.Status) == database.FnReady {
 			// we found a ready instance so we return it
-			return id, 0, nil
+			return fnState, 0, nil
 		}
 	}
 
@@ -61,7 +54,7 @@ func (s *Scheduler) LookForReadyInstance(functionId uuid.UUID, cursor uint64) (i
 		return s.LookForReadyInstance(functionId, returnedCursor)
 	}
 
-	return "", 0, errors.New("could not find an available function")  // we did not find anything thus, id is empty
+	return fnState, 0, ErrRecordNotFound  // we did not find anything thus, id is empty
 } 
 
 func (s *Scheduler) SpawnVM(functionId uuid.UUID) (LambdoRunResponse LambdoSpawnResponse, err error) {
@@ -71,20 +64,21 @@ func (s *Scheduler) SpawnVM(functionId uuid.UUID) (LambdoRunResponse LambdoSpawn
 		return
 	}
 
-	locationID := fmt.Sprintf(functionId.String(), ":", res.ID)
+	stateID := fmt.Sprintf(functionId.String(), ":", res.ID)
 	
-	err = s.Redis.HSet(*s.Context, locationID, &FunctionLocation{ 
+	err = s.Redis.HSet(*s.Context, stateID, &database.FunctionState{ 
+		ID: res.ID,
 		Address: res.Address, 
 		Port: res.Port,
-		Status: Creating,
+		Status: database.FnCreating,
 		LastUsed: "never",
 	}).Err()
 	
 	return
 }
 
-func (s *Scheduler) GetFunctionLocations(functionId uuid.UUID) (locations []FunctionLocation) {
-	locationQuery := fmt.Sprintf(functionId.String(), ":*")
+func (s *Scheduler) GetFunctionStates(functionId uuid.UUID) (states []database.FunctionState) {
+	stateQuery := fmt.Sprintf(functionId.String(), ":*")
 	firstsweep, cursor := true, uint64(0)
 	
 	// because do-while does not exists in these lands
@@ -92,17 +86,17 @@ func (s *Scheduler) GetFunctionLocations(functionId uuid.UUID) (locations []Func
 		firstsweep = false
 
 		var keys []string 
-		keys, cursor = s.Redis.Scan(*s.Context, cursor, locationQuery, 10).Val()
+		keys, cursor = s.Redis.Scan(*s.Context, cursor, stateQuery, 10).Val()
 		
 		// for each key we got, we retrieve all of it's information
 		for _, ID := range keys {
-			var location FunctionLocation
+			var state database.FunctionState
 			
-			if s.Redis.HGetAll(*s.Context, ID).Scan(&location) != nil {
+			if s.Redis.HGetAll(*s.Context, ID).Scan(&state) != nil {
 				return
 			}
 
-			locations = append(locations, location)
+			states = append(states, state)
 		}
 	}
 
