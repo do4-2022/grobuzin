@@ -17,12 +17,16 @@ type LambdoService struct {
 }
 
 type LambdoSpawnRequest struct {
+	// URL to the rootfs of the function
 	RootfsURL 		string		`json:"rootfs"`
+	// Ports that the virtual machine needs to be exposed
+	// right now we only support one port
 	RequestedPorts	[]uint16	`json:"requestedPorts"`
 }
 
 type LambdoSpawnResponse struct {
 	ID		string		`json:"ID"`
+	// Ports mapped by lambdo, leading to the requested ports
 	Ports	[]uint16 	`json:"ports"`
 }
 
