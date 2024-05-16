@@ -182,13 +182,6 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 
 	var fn database.Function
 	var fnState database.FunctionState
-	
-	fnBody, err := io.ReadAll(ctx.Request.Body); // because the body is entirely defined by the user, we just forward it to the function without checking it
-
-	if err != nil {
-		ctx.AbortWithStatusJSON(400, gin.H{"error": "Invalid request body"})
-		return
-	}
 
 	// does the function exist?
 	err = c.DB.Where(&database.Function{ID: fnID}).First(&fn).Error
@@ -210,6 +203,7 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 			return
 		}
 
+		// retrieving freshly created function state
 		fnState, err = c.Scheduler.GetStateByID(
 			fmt.Sprintf(fnID.String(), ":", res.ID),
 		)
@@ -217,9 +211,9 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 		if err != nil {
 			return
 		} 
-	}
-
-	if err != nil {
+	} else if err != nil { // else if the error is not a record not found, we return an error
+		log.Println(err.Error())
+		ctx.AbortWithStatusJSON(500, gin.H{"error": "Could not cold start the function"})
 		return
 	}
 
@@ -235,9 +229,9 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 			// we check if it is ready
 			fnState, err := c.Scheduler.GetStateByID(stateID)
 
-			// if the error is something else than a record not found, we return an error, else we retry since it is not ready yet
 			if err != nil { 
-				ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
+				log.Println(err.Error())
+				ctx.AbortWithStatusJSON(500, gin.H{"Could not cold start the function": err.Error()})
 				return
 			}
 
@@ -249,15 +243,16 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 
 		// if even after 5 attempts the function is not ready, we return an error
 		if fnState.Status != database.FnReady {
-			ctx.AbortWithStatusJSON(500, gin.H{"error": "Function is not ready"})
+			ctx.AbortWithStatusJSON(503, gin.H{"error": "Function is not ready"})
 			return
 		}
 	}
 
+	// we notify everyone that the function is running
 	err = c.Scheduler.SetStatus(stateID, database.FnRunning)
 
 	if err != nil {
-		log.Println(err.Error())
+		log.Println(fmt.Sprint("Could not update state of VM", fnState.ID ,": ", err.Error()))
 		ctx.AbortWithStatusJSON(500, gin.H{"error": "Cannot update function's status"})
 		return
 	}
@@ -265,11 +260,12 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 	_, err = http.Post(
 		fmt.Sprint("http://", string(fnState.Address), ":", fnState.Port, "/execute"),
 		"application/json",
-		bytes.NewReader(fnBody),
+		ctx.Request.Body,
 	)
 
+	// if the function had trouble running, we update the status to unknown
 	if err != nil {
-		ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})	
+		ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
 		_ = c.Scheduler.SetStatus(stateID, database.FnUnknownState)
 		return
 	} else {
@@ -279,6 +275,9 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 	err = c.Scheduler.SetStatus(stateID, database.FnReady)
 
 	if err != nil {
+		log.Println(
+			fmt.Sprint("Could not update state of VM", fnState.ID ,": ", err.Error()),
+		)
 		log.Println(err.Error())
 	}
 }
