@@ -2,9 +2,8 @@ package database
 
 type FnStatusCode int
 
-const (
-	FnCreating FnStatusCode = iota
-	FnReady
+const ( 
+	FnReady 		FnStatusCode = iota
 	FnRunning
 	FnUnknownState
 )

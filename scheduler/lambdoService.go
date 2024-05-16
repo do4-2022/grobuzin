@@ -17,13 +17,13 @@ type LambdoService struct {
 }
 
 type LambdoSpawnRequest struct {
-	RootfsURL string `json:"rootfs"`
+	RootfsURL 		string		`json:"rootfs"`
+	RequestedPorts	[]uint16	`json:"requestedPorts"`
 }
 
 type LambdoSpawnResponse struct {
-	ID		string	`json:"ID"`
-	Port	uint16 	`json:"port"`
-	Address string	`json:"address"`
+	ID		string		`json:"ID"`
+	Ports	[]uint16 	`json:"ports"`
 }
 
 func (service *LambdoService) SpawnVM(function_id uuid.UUID) (data LambdoSpawnResponse, err error) {
