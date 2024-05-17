@@ -14,5 +14,4 @@ type Function struct {
 	OwnerID int  `json:"owner_id"`
 	Owner   User `json:"-"`
 
-	FunctionStates []FunctionState `json:"-"`
 }
