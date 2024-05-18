@@ -28,7 +28,7 @@ type Controller struct {
 // Checks if said user owns the function in order to perform CRUD operations
 func (c *Controller) IsOwner(userId uint, fnId string) (found bool, err error) {
 	err = c.DB.Where(
-		"ID = ? AND OwnerID = ?", 
+		"ID = ? AND owner_id = ?", 
 		fnId, 
 		userId,
 	).Select(
@@ -115,10 +115,12 @@ func (cont *Controller) PostFunction(c *gin.Context) {
 	}
 
 	var function = database.Function{
-		ID:          id,
-		Name:        dto.Name,
-		Description: dto.Description,
-		Language:    dto.Language,
+		ID:          	id,
+		Name:        	dto.Name,
+		Description: 	dto.Description,
+		Language:    	dto.Language,
+		OwnerID: 		userID,
+		Built: 			false,	
 	}
 	cont.DB.Create(&function)
 

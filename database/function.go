@@ -11,7 +11,7 @@ type Function struct {
 	Language    string    `json:"language"`
 	Built       bool      `json:"built"` // The builder has built the image for this function
 
-	OwnerID int  `json:"owner_id"`
+	OwnerID uint  `json:"owner_id"` // todo: change userID to uuid
 	Owner   User `json:"-"`
 
 }
