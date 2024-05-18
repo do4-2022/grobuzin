@@ -25,6 +25,20 @@ type Controller struct {
 	Scheduler          *scheduler.Scheduler
 }
 
+// Checks if said user owns the function in order to perform CRUD operations
+func (c *Controller) IsOwner(userId uint, fnId string) (found bool, err error) {
+	err = c.DB.Where(
+		"ID = ? AND OwnerID = ?", 
+		fnId, 
+		userId,
+	).Select(
+		"ID", // because we don't need the whole object
+	).First(&database.Function{}).Error
+
+	found = err == nil // gorm returns an error if the record is not found so no need to do a separate check
+	return
+}
+
 func (cont *Controller) GetAllFunction(c *gin.Context) {
 	var functions []database.Function
 	cont.DB.Find(&functions)
@@ -34,6 +48,7 @@ func (cont *Controller) GetAllFunction(c *gin.Context) {
 
 func (cont *Controller) GetOneFunction(c *gin.Context) {
 	id := c.Param("id")
+	userID := c.GetUint("userID")
 
 	var function database.Function
 	result := cont.DB.Find(&function, "ID = ?", id)
@@ -45,6 +60,18 @@ func (cont *Controller) GetOneFunction(c *gin.Context) {
 	if result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Function not found!"})
 		return
+	}
+
+	isOwner, err := cont.IsOwner(userID, id)
+
+	if !isOwner {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not the owner of this function"})
+		return
+	}
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error!"})
 	}
 
 	files, err := cont.CodeStorageService.GetCode(uuid.MustParse(id))
@@ -65,6 +92,22 @@ func (cont *Controller) GetOneFunction(c *gin.Context) {
 
 func (cont *Controller) PostFunction(c *gin.Context) {
 	id := uuid.New()
+	userID := c.GetUint("userID")
+
+	// does the user exist?
+	var user database.User
+	err := cont.DB.First(&user, userID).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found!"})
+		return
+	}
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Database error!"})
+		return
+	}
+
 	var dto FunctionDTO
 	if err := c.ShouldBindJSON(&dto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -80,7 +123,7 @@ func (cont *Controller) PostFunction(c *gin.Context) {
 	cont.DB.Create(&function)
 
 	cont.CodeStorageService.PutCode(id, dto.Files)
-	err := cont.buildImage(id.String(), dto.Language, dto.Files)
+	err = cont.buildImage(id.String(), dto.Language, dto.Files)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Unable to build image!"})
 		return
@@ -90,6 +133,8 @@ func (cont *Controller) PostFunction(c *gin.Context) {
 }
 
 func (cont *Controller) PutFunction(c *gin.Context) {
+	userID := c.GetUint("userID")
+
 	var json FunctionDTO
 	if err := c.ShouldBindJSON(&json); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -97,6 +142,19 @@ func (cont *Controller) PutFunction(c *gin.Context) {
 	}
 
 	var uuid uuid.UUID = uuid.MustParse(c.Param("id"))
+
+	isOwner, err := cont.IsOwner(userID, uuid.String())
+
+	if !isOwner {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not the owner of this function"})
+		return
+	}
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error!"})
+	}
+
 	var function = database.Function{
 		ID:          uuid,
 		Name:        json.Name,
@@ -107,7 +165,7 @@ func (cont *Controller) PutFunction(c *gin.Context) {
 	cont.DB.Save(function)
 
 	cont.CodeStorageService.PutCode(uuid, json.Files)
-	err := cont.buildImage(uuid.String(), json.Language, json.Files)
+	err = cont.buildImage(uuid.String(), json.Language, json.Files)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Unable to build image!"})
 		return
@@ -118,9 +176,22 @@ func (cont *Controller) PutFunction(c *gin.Context) {
 
 func (cont *Controller) DeleteFunction(c *gin.Context) {
 	var uuid uuid.UUID = uuid.MustParse(c.Param("id"))
+	userID := c.GetUint("userID")
+
+	isOwner, err := cont.IsOwner(userID, uuid.String())
+
+	if !isOwner {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not the owner of this function"})
+		return
+	}
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error!"})
+	}
 
 	cont.DB.Delete(&database.Function{ID: uuid})
-	err := cont.CodeStorageService.DeleteCode(uuid)
+	err = cont.CodeStorageService.DeleteCode(uuid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Unable to delete code!"})
 		return
