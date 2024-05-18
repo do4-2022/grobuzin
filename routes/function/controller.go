@@ -19,10 +19,10 @@ import (
 )
 
 type Controller struct {
-	CodeStorageService *objectStorage.CodeStorageService
-	DB                 *gorm.DB
-	BuilderEndpoint    string
-	Scheduler          *scheduler.Scheduler
+	CodeStorageService 	*objectStorage.CodeStorageService
+	DB                 	*gorm.DB
+	BuilderEndpoint    	string
+	Scheduler          	*scheduler.Scheduler
 }
 
 // Checks if said user owns the function in order to perform CRUD operations
