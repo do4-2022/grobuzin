@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/do4-2022/grobuzin/database"
+	"github.com/do4-2022/grobuzin/objectStorage"
 	"github.com/do4-2022/grobuzin/routes"
 	"github.com/do4-2022/grobuzin/scheduler"
 
@@ -19,6 +21,7 @@ import (
 
 type Config struct {
 	// rootFsStorageDSN string `env:"ROOT_FS_STORAGE_DSN,notEmpty"`
+	LambdoURL			   string `env:"LAMBDO_URL,notEmpty"`
 	VMStateURL             string `env:"VM_STATE_URL,notEmpty"`
 	FuntionStateStorageDSN string `env:"FUNCTION_STATE_STORAGE_DSN,notEmpty" envDefault:"host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable TimeZone=Asia/Shanghai"`
 	JWTSecret              string `env:"JWT_SECRET,notEmpty"`
@@ -41,6 +44,15 @@ func main() {
 	s := &scheduler.Scheduler{
 		Redis:   redis,
 		Context: &ctx,
+		Lambdo: &scheduler.LambdoService{
+			URL: cfg.LambdoURL,
+			BucketURL: fmt.Sprint(
+				cfg.MinioEndpoint, 
+				"/", 
+				objectStorage.BucketName,
+				"/",
+			),
+		},
 	}
 	//Now inject the scheduler into the routes that need it!
 

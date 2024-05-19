@@ -11,9 +11,11 @@ import (
 	"github.com/minio/minio-go/v7"
 )
 
+// Constants starting with a capital letter are exported
 const (
-	bucketName     = "functions"
+	BucketName     = "functions"
 	codeFileSuffix = "/code.json"
+	RooFSFile 	   = "/rootfs.ext4"
 	location       = "eu-west-1"
 )
 
@@ -24,17 +26,17 @@ type CodeStorageService struct {
 func (service *CodeStorageService) Init() {
 
 	ctx := context.Background()
-	err := service.MinioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{Region: location})
+	err := service.MinioClient.MakeBucket(ctx, BucketName, minio.MakeBucketOptions{Region: location})
 	if err != nil {
 		// Check to see if we already own this bucket (which happens if you run this twice)
-		exists, errBucketExists := service.MinioClient.BucketExists(ctx, bucketName)
+		exists, errBucketExists := service.MinioClient.BucketExists(ctx, BucketName)
 		if errBucketExists == nil && exists {
-			log.Printf("We already own %s\n", bucketName)
+			log.Printf("We already own %s\n", BucketName)
 		} else {
 			log.Fatalln(err)
 		}
 	} else {
-		log.Printf("Successfully created %s\n", bucketName)
+		log.Printf("Successfully created %s\n", BucketName)
 	}
 }
 func (service *CodeStorageService) PutCode(id uuid.UUID, files map[string]string) {
@@ -50,7 +52,7 @@ func (service *CodeStorageService) PutCode(id uuid.UUID, files map[string]string
 
 	reader := bytes.NewReader([]byte(jsonFiles))
 
-	_, err = service.MinioClient.PutObject(ctx, bucketName, filePath, reader, -1, minio.PutObjectOptions{ContentType: contentType})
+	_, err = service.MinioClient.PutObject(ctx, BucketName, filePath, reader, -1, minio.PutObjectOptions{ContentType: contentType})
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -60,7 +62,7 @@ func (service *CodeStorageService) GetCode(id uuid.UUID) (map[string]string, err
 	ctx := context.Background()
 	filePath := id.String() + codeFileSuffix
 
-	object, err := service.MinioClient.GetObject(ctx, bucketName, filePath, minio.GetObjectOptions{})
+	object, err := service.MinioClient.GetObject(ctx, BucketName, filePath, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +86,7 @@ func (service *CodeStorageService) DeleteCode(id uuid.UUID) error {
 	ctx := context.Background()
 	filePath := id.String() + codeFileSuffix
 
-	err := service.MinioClient.RemoveObject(ctx, bucketName, filePath, minio.RemoveObjectOptions{})
+	err := service.MinioClient.RemoveObject(ctx, BucketName, filePath, minio.RemoveObjectOptions{})
 	if err != nil {
 		return err
 	}
@@ -96,9 +98,9 @@ func (service *CodeStorageService) DeleteCode(id uuid.UUID) error {
 func (service *CodeStorageService) DeleteRootFs(id uuid.UUID) error {
 	ctx := context.Background()
 	
-	filePath := fmt.Sprintf("function/%s/rootfs.ext4", id)
+	filePath := fmt.Sprintf("function/%s/%s", id, RooFSFile)
 
-	err := service.MinioClient.RemoveObject(ctx, bucketName, filePath, minio.RemoveObjectOptions{})
+	err := service.MinioClient.RemoveObject(ctx, BucketName, filePath, minio.RemoveObjectOptions{})
 	if err != nil {
 		return err
 	}
