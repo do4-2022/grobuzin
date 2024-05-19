@@ -27,9 +27,11 @@ type LambdoSpawnRequest struct {
 }
 
 type LambdoSpawnResponse struct {
-	ID		string		`json:"ID"`
+	ID		string		`json:"id"`
 	// Ports mapped by lambdo, leading to the requested ports
-	Ports	[]uint16 	`json:"ports"`
+	// this a tuple under the form [host_port, vm_port]
+	// for now we only support one port
+	Ports	[][2]uint16 	`json:"port_mapping"` 
 }
 
 func (service *LambdoService) SpawnVM(function_id uuid.UUID) (data LambdoSpawnResponse, err error) {
