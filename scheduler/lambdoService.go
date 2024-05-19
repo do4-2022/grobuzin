@@ -2,7 +2,9 @@ package scheduler
 
 import (
 	"fmt"
+	"log"
 
+	"github.com/do4-2022/grobuzin/objectStorage"
 	"github.com/google/uuid"
 
 	"bytes"
@@ -13,7 +15,7 @@ import (
 
 type LambdoService struct {
 	URL 		string
-	MinioURL 	string
+	BucketURL 	string
 }
 
 type LambdoSpawnRequest struct {
@@ -38,16 +40,21 @@ func (service *LambdoService) SpawnVM(function_id uuid.UUID) (data LambdoSpawnRe
 		}
 	}()
 
+	log.Println("Spawning VM for function", function_id)
+	
+	RootfsURL := fmt.Sprint(service.BucketURL, function_id.String(), objectStorage.RooFSFile)
+
 	body, err := json.Marshal(&LambdoSpawnRequest{
-		RootfsURL: fmt.Sprintf("%s/%s", service.MinioURL, function_id),
-	})
+		RootfsURL: RootfsURL,
+		RequestedPorts: []uint16{8080}, // for now only a gin gonic instance for the agent is serving on 8080
+	})	
 
 	if err != nil {
 		return 
 	}
 
 	res, err = http.Post(
-		fmt.Sprintf(service.URL, "/spawn"), 
+		fmt.Sprint(service.URL, "/spawn"), 
 		"application/json", 
 		bytes.NewReader(body),
 	)
