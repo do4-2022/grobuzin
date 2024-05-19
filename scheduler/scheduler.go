@@ -78,7 +78,7 @@ func (s *Scheduler) SpawnVM(functionId uuid.UUID) (fnState database.FunctionStat
 	fnState = database.FunctionState{ 
 		ID: res.ID,
 		Address: s.Lambdo.URL, 
-		Port: res.Ports[0],
+		Port: res.Ports[0][0],
 		Status: database.FnReady,
 		LastUsed: "never",
 	}
