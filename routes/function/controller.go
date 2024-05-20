@@ -18,6 +18,12 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	NotOwner = "You are not the owner of this function"
+	NotFound = "Function not found!"
+	DBError  = "Database error!"
+)
+
 type Controller struct {
 	CodeStorageService 	*objectStorage.CodeStorageService
 	DB                 	*gorm.DB
@@ -26,16 +32,29 @@ type Controller struct {
 }
 
 // Checks if said user owns the function in order to perform CRUD operations
-func (c *Controller) IsOwner(userId uint, fnId string) (found bool, err error) {
-	err = c.DB.Where(
-		"ID = ? AND owner_id = ?", 
-		fnId, 
-		userId,
-	).Select(
-		"ID", // because we don't need the whole object
-	).First(&database.Function{}).Error
+func (c *Controller) IsOwner(userId uint, fnId string) (isOwner bool, err error) {
+	var res database.Function
+	isOwner = false
 
-	found = err == nil // gorm returns an error if the record is not found so no need to do a separate check
+	tx := c.DB.Where(
+		"ID = ?", 
+		fnId, 
+	).Select(
+		"OwnerID", // because we don't need the whole object
+	).First(&res)
+
+	err = tx.Error
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(err.Error())
+
+		return 
+	}
+
+	log.Println("OwnerID: ", res.OwnerID, "UserID: ", userId)
+
+	isOwner = tx.RowsAffected > 0 && res.OwnerID == userId 
+
 	return
 }
 
@@ -54,24 +73,28 @@ func (cont *Controller) GetOneFunction(c *gin.Context) {
 	result := cont.DB.Find(&function, "ID = ?", id)
 
 	if result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Database error!"})
+		c.JSON(http.StatusNotFound, gin.H{"error": DBError})
 		return
 	}
 	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Function not found!"})
+		c.JSON(http.StatusNotFound, gin.H{"error": NotFound})
 		return
 	}
 
 	isOwner, err := cont.IsOwner(userID, id)
 
-	if !isOwner {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not the owner of this function"})
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": DBError})
+	} else if err != nil {
+		// if the function does not exist, we return a 404
+		c.JSON(http.StatusNotFound, gin.H{"error": NotFound})
 		return
 	}
 
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		log.Println(err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error!"})
+	if !isOwner {
+		c.JSON(http.StatusForbidden, gin.H{"error": NotOwner})
+		return
 	}
 
 	files, err := cont.CodeStorageService.GetCode(uuid.MustParse(id))
@@ -104,7 +127,7 @@ func (cont *Controller) PostFunction(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Database error!"})
+		c.JSON(http.StatusNotFound, gin.H{"error": DBError})
 		return
 	}
 
@@ -147,14 +170,18 @@ func (cont *Controller) PutFunction(c *gin.Context) {
 
 	isOwner, err := cont.IsOwner(userID, uuid.String())
 
-	if !isOwner {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not the owner of this function"})
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": DBError})
+	} else if err != nil {
+		// if the function does not exist, we return a 404
+		c.JSON(http.StatusNotFound, gin.H{"error": NotFound})
 		return
 	}
 
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		log.Println(err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error!"})
+	if !isOwner {
+		c.JSON(http.StatusForbidden, gin.H{"error": NotOwner})
+		return
 	}
 
 	var function = database.Function{
@@ -182,14 +209,23 @@ func (cont *Controller) DeleteFunction(c *gin.Context) {
 
 	isOwner, err := cont.IsOwner(userID, uuid.String())
 
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": DBError})
+	} else if err != nil {
+		// if the function does not exist, we return a 404
+		c.JSON(http.StatusNotFound, gin.H{"error": NotFound})
+		return
+	}
+
 	if !isOwner {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not the owner of this function"})
+		c.JSON(http.StatusForbidden, gin.H{"error": NotOwner})
 		return
 	}
 
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Println(err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error!"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": DBError})
 	}
 
 	cont.DB.Delete(&database.Function{ID: uuid})
@@ -260,7 +296,7 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 	err = c.DB.Where(&database.Function{ID: fnID}).First(&fn).Error
 
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		ctx.AbortWithStatusJSON(404, gin.H{"error": "Function not found"})
+		ctx.AbortWithStatusJSON(404, gin.H{"error": NotFound})
 		return
 	}
 
