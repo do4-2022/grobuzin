@@ -4,13 +4,18 @@ import (
 	"fmt"
 	"log"
 
+
+	"github.com/do4-2022/grobuzin/database"
 	"github.com/do4-2022/grobuzin/objectStorage"
-	"github.com/google/uuid"
 
 	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
+)
+
+const (
+	IDTimestampSeparator = "_"
 )
 
 type LambdoService struct {
@@ -19,6 +24,8 @@ type LambdoService struct {
 }
 
 type LambdoSpawnRequest struct {
+	// An identifier for the function, consists of the function ID + the build timestamp so lambdo can cache the rootfs
+	ID				string		`json:"id"`
 	// URL to the rootfs of the function
 	RootfsURL 		string		`json:"rootfs"`
 	// Ports that the virtual machine needs to be exposed
@@ -34,7 +41,7 @@ type LambdoSpawnResponse struct {
 	Ports	[][2]uint16 	`json:"port_mapping"` 
 }
 
-func (service *LambdoService) SpawnVM(function_id uuid.UUID) (data LambdoSpawnResponse, err error) {
+func (service *LambdoService) SpawnVM(function database.Function) (data LambdoSpawnResponse, err error) {
 	var res *http.Response
 	defer func() {
 		if res != nil {
@@ -42,13 +49,14 @@ func (service *LambdoService) SpawnVM(function_id uuid.UUID) (data LambdoSpawnRe
 		}
 	}()
 
-	log.Println("Spawning VM for function", function_id)
+	log.Println("Spawning VM for function", function.ID.String())
 	
-	RootfsURL := fmt.Sprint(service.BucketURL, function_id.String(), objectStorage.RooFSFile)
+	RootfsURL := fmt.Sprint(service.BucketURL, function.ID.String(), objectStorage.RooFSFile)
 
 	body, err := json.Marshal(&LambdoSpawnRequest{
+		ID: fmt.Sprint(function.ID.String(), IDTimestampSeparator, function.BuildTimestamp),
 		RootfsURL: RootfsURL,
-		RequestedPorts: []uint16{8080}, // for now only a gin gonic instance for the agent is serving on 8080
+		RequestedPorts: []uint16{8080}, // for now there's only a gin gonic instance for the agent is serving on 8080
 	})	
 
 	if err != nil {

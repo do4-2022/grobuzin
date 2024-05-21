@@ -66,14 +66,14 @@ func (s *Scheduler) LookForReadyInstance(functionId uuid.UUID, cursor uint64) (f
 	return fnState, 0, ErrRecordNotFound  // we did not find anything thus, id is empty
 } 
 
-func (s *Scheduler) SpawnVM(functionId uuid.UUID) (fnState database.FunctionState, err error) {
-	res, err := s.Lambdo.SpawnVM(functionId)
+func (s *Scheduler) SpawnVM(function database.Function) (fnState database.FunctionState, err error) {
+	res, err := s.Lambdo.SpawnVM(function)
 
 	if (err != nil) {
 		return
 	}
 
-	stateID := fmt.Sprintf(functionId.String(), ":", res.ID)
+	stateID := fmt.Sprintf(function.ID.String(), ":", res.ID)
 
 	fnState = database.FunctionState{ 
 		ID: res.ID,
