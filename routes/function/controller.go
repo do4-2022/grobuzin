@@ -196,7 +196,7 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 
 	// if the function does not have an instance, we create ask the scheduler to create one
 	if errors.Is(err, scheduler.ErrRecordNotFound) {
-		res, err := c.Scheduler.SpawnVM(fnID)
+		res, err := c.Scheduler.SpawnVM(fn)
 
 		if err != nil {
 			ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
