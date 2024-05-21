@@ -50,7 +50,6 @@ func main() {
 				cfg.MinioEndpoint, 
 				"/", 
 				objectStorage.BucketName,
-				"/",
 			),
 		},
 	}
