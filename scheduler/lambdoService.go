@@ -23,11 +23,14 @@ type LambdoService struct {
 	BucketURL 	string
 }
 
+type RootFSInfo struct {
+	ID 			string `json:"id"`
+	Location 	string `json:"location"`
+}
+
 type LambdoSpawnRequest struct {
-	// An identifier for the function, consists of the function ID + the build timestamp so lambdo can cache the rootfs
-	ID				string		`json:"id"`
 	// URL to the rootfs of the function
-	RootfsURL 		string		`json:"rootfs"`
+	Rootfs 			RootFSInfo	`json:"rootfs"`
 	// Ports that the virtual machine needs to be exposed
 	// right now we only support one port
 	RequestedPorts	[]uint16	`json:"requestedPorts"`
@@ -51,11 +54,13 @@ func (service *LambdoService) SpawnVM(function database.Function) (data LambdoSp
 
 	log.Println("Spawning VM for function", function.ID.String())
 	
-	RootfsURL := fmt.Sprint(service.BucketURL, function.ID.String(), objectStorage.RooFSFile)
+	RootfsURL := fmt.Sprint(service.BucketURL, "/", function.ID.String(), objectStorage.RooFSFile)
 
 	body, err := json.Marshal(&LambdoSpawnRequest{
-		ID: fmt.Sprint(function.ID.String(), IDTimestampSeparator, function.BuildTimestamp),
-		RootfsURL: RootfsURL,
+		Rootfs: RootFSInfo{
+			ID: fmt.Sprint(function.ID.String(), IDTimestampSeparator, function.BuildTimestamp),
+			Location: RootfsURL,
+		},
 		RequestedPorts: []uint16{8080}, // for now there's only a gin gonic instance for the agent is serving on 8080
 	})	
 
