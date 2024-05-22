@@ -41,7 +41,7 @@ func (s *Scheduler) SetStatus(id string, status database.FnStatusCode) error {
 // Uses SCAN to look for the first instance marked as ready (https://redis.io/docs/latest/commands/scan/)
 func (s *Scheduler) LookForReadyInstance(functionId uuid.UUID, cursor uint64) (fnState database.FunctionState, returnedCursor uint64, err error) {
 	// match rule to get all instances of a function 
-	stateMatch := fmt.Sprintf(functionId.String(), ":*")
+	stateMatch := fmt.Sprint(functionId.String(), ":*")
 
 	keys, returnedCursor, err := s.Redis.Scan(*s.Context, cursor, stateMatch, 10).Result()
 
@@ -73,7 +73,7 @@ func (s *Scheduler) SpawnVM(function database.Function) (fnState database.Functi
 		return
 	}
 
-	stateID := fmt.Sprintf(function.ID.String(), ":", res.ID)
+	stateID := fmt.Sprint(function.ID.String(), ":", res.ID)
 
 	fnState = database.FunctionState{ 
 		ID: res.ID,

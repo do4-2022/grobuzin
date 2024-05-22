@@ -90,7 +90,7 @@ func (service *LambdoService) SpawnVM(function database.Function) (data LambdoSp
 }
 
 func (service *LambdoService) DeleteVM(VMID string) (err error) {
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf(service.URL, "/destroy/", VMID ), nil)
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprint(service.URL, "/destroy/", VMID ), nil)
 	if err != nil {
 		return
 	}

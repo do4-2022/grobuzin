@@ -206,7 +206,7 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 
 		// retrieving freshly created function state
 		fnState, err = c.Scheduler.GetStateByID(
-			fmt.Sprintf(fnID.String(), ":", res.ID),
+			fmt.Sprint(fnID.String(), ":", res.ID),
 		)
 
 		if err != nil {
@@ -220,7 +220,7 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 		return
 	}
 
-	stateID := fmt.Sprintf(fnID.String(), ":", fnState.ID)
+	stateID := fmt.Sprint(fnID.String(), ":", fnState.ID)
 
 	if fnState.Status != int(database.FnReady) {
 		log.Println("Waiting for function", fn.ID, "to be ready")
