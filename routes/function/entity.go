@@ -16,3 +16,13 @@ type GetFunctionDTO struct {
 	BuildTimestamp int64             `json:"build_timestamp"`
 	OwnerID        int               `json:"owner_id"`
 }
+
+type ExecutionResultDTO struct {
+	Time     int64             `json:"time"`
+	Response ExecutionResponse `json:"response"`
+}
+type ExecutionResponse struct {
+	Status  int               `json:"status"`
+	Body    interface{}       `json:"body"`
+	Headers map[string]string `json:"headers"`
+}
