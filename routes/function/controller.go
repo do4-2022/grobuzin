@@ -204,6 +204,8 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 			return
 		}
 
+		time.Sleep(500 * time.Millisecond) // wait for the agents to start, remove this line when  liveness probes will be a thing
+
 		// retrieving freshly created function state
 		fnState, err = c.Scheduler.GetStateByID(
 			fmt.Sprint(fnID.String(), ":", res.ID),
@@ -224,11 +226,11 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 
 	if fnState.Status != int(database.FnReady) {
 		log.Println("Waiting for function", fn.ID, "to be ready")
-		time.Sleep(100 * time.Millisecond)
-
 
 		// we will try 5 times to check if the instance is ready
 		for attempts := 0; attempts < 5; attempts++ {
+			time.Sleep(100 * time.Millisecond)
+
 			// we check if it is ready
 			fnState, err := c.Scheduler.GetStateByID(stateID)
 

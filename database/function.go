@@ -12,7 +12,7 @@ type Function struct {
 	Built       	bool      `json:"built"` // The builder has built the image for this function
 	BuildTimestamp 	int64	  `json:"build_timestamp"` // The timestamp of the last build in Unix time
 
-	OwnerID int  `json:"owner_id"`
-	Owner   User `json:"-"`
+	// OwnerID int  `json:"owner_id"`
+	// Owner   User `json:"-"`
 
 }
