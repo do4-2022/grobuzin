@@ -229,6 +229,7 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 
 	if fnState.Status != int(database.FnReady) {
 		log.Println("Waiting for function", fn.ID, "to be ready")
+		time.Sleep(100 * time.Millisecond)
 
 		// we will try 5 times to check if the instance is ready
 		for attempts := 0; attempts < 5; attempts++ {
@@ -265,7 +266,7 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 		return
 	}
 
-	_, err = http.Post(
+	function_result, err := http.Post(
 		fmt.Sprint(string(fnState.Address), ":", fnState.Port, "/execute"),
 		"application/json",
 		ctx.Request.Body,
@@ -276,8 +277,6 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
 		_ = c.Scheduler.SetStatus(stateID, database.FnUnknownState)
 		return
-	} else {
-		ctx.Status(204)
 	}
 
 	err = c.Scheduler.SetStatus(stateID, database.FnReady)
@@ -288,4 +287,26 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 		)
 		log.Println(err.Error())
 	}
+
+	var (
+		executionResult ExecutionResultDTO
+		body            []byte
+	)
+
+	body, err = io.ReadAll(function_result.Body)
+
+	if err != nil {
+		ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
+		log.Println("error reading body", err)
+		return
+	}
+	err = json.Unmarshal(body, &executionResult)
+
+	if err != nil {
+		ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
+		log.Println("error unmarshalling body", err)
+		return
+	}
+
+	ctx.JSON(executionResult.Response.Status, executionResult.Response.Body)
 }
