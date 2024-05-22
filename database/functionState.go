@@ -12,9 +12,9 @@ const (
 // Each key in the redis is namespaced as it follows:
 // <id of the function>:<id of the instance>
 type FunctionState struct {
-	ID			string			`redis:"address"`
-	Address 	string			`redis:"address"`
-	Port    	uint16			`redis:"port"`
-	Status 		FnStatusCode 	`redis:"status"`
-	LastUsed	string			`redis:"lastUsed"`
+	ID			string	`redis:"address"`
+	Address 	string	`redis:"address"`
+	Port    	uint16	`redis:"port"`
+	Status 		int		`redis:"status"`
+	LastUsed	string	`redis:"lastUsed"`
 }
