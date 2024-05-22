@@ -7,7 +7,7 @@ import (
 
 type Claims struct {
 	jwt.RegisteredClaims
-	ID uint `json:"id"`
+	ID uint `json:"id"` // User's id
 }
 
 func (c *Controller) createJWT(user database.User) (string, error) {

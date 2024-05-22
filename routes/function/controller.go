@@ -18,11 +18,44 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	NotOwner = "You are not the owner of this function"
+	NotFound = "Function not found!"
+	DBError  = "Database error!"
+)
+
 type Controller struct {
-	CodeStorageService *objectStorage.CodeStorageService
-	DB                 *gorm.DB
-	BuilderEndpoint    string
-	Scheduler          *scheduler.Scheduler
+	CodeStorageService 	*objectStorage.CodeStorageService
+	DB                 	*gorm.DB
+	BuilderEndpoint    	string
+	Scheduler          	*scheduler.Scheduler
+}
+
+// Checks if said user owns the function in order to perform CRUD operations
+func (c *Controller) IsOwner(userId uint, fnId string) (isOwner bool, err error) {
+	var res database.Function
+	isOwner = false
+
+	tx := c.DB.Where(
+		"ID = ?", 
+		fnId, 
+	).Select(
+		"OwnerID", // because we don't need the whole object
+	).First(&res)
+
+	err = tx.Error
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(err.Error())
+
+		return 
+	}
+
+	log.Println("OwnerID: ", res.OwnerID, "UserID: ", userId)
+
+	isOwner = tx.RowsAffected > 0 && res.OwnerID == userId 
+
+	return
 }
 
 func (cont *Controller) GetAllFunction(c *gin.Context) {
@@ -34,16 +67,33 @@ func (cont *Controller) GetAllFunction(c *gin.Context) {
 
 func (cont *Controller) GetOneFunction(c *gin.Context) {
 	id := c.Param("id")
+	userID := c.GetUint("userID")
 
 	var function database.Function
 	result := cont.DB.Find(&function, "ID = ?", id)
 
 	if result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Database error!"})
+		c.JSON(http.StatusNotFound, gin.H{"error": DBError})
 		return
 	}
 	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Function not found!"})
+		c.JSON(http.StatusNotFound, gin.H{"error": NotFound})
+		return
+	}
+
+	isOwner, err := cont.IsOwner(userID, id)
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": DBError})
+	} else if err != nil {
+		// if the function does not exist, we return a 404
+		c.JSON(http.StatusNotFound, gin.H{"error": NotFound})
+		return
+	}
+
+	if !isOwner {
+		c.JSON(http.StatusForbidden, gin.H{"error": NotOwner})
 		return
 	}
 
@@ -65,6 +115,22 @@ func (cont *Controller) GetOneFunction(c *gin.Context) {
 
 func (cont *Controller) PostFunction(c *gin.Context) {
 	id := uuid.New()
+	userID := c.GetUint("userID")
+
+	// does the user exist?
+	var user database.User
+	err := cont.DB.First(&user, userID).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found!"})
+		return
+	}
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": DBError})
+		return
+	}
+
 	var dto FunctionDTO
 	if err := c.ShouldBindJSON(&dto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -72,15 +138,17 @@ func (cont *Controller) PostFunction(c *gin.Context) {
 	}
 
 	var function = database.Function{
-		ID:          id,
-		Name:        dto.Name,
-		Description: dto.Description,
-		Language:    dto.Language,
+		ID:          	id,
+		Name:        	dto.Name,
+		Description: 	dto.Description,
+		Language:    	dto.Language,
+		OwnerID: 		userID,
+		Built: 			false,	
 	}
 	cont.DB.Create(&function)
 
 	cont.CodeStorageService.PutCode(id, dto.Files)
-	err := cont.buildImage(id.String(), dto.Language, dto.Files)
+	err = cont.buildImage(id.String(), dto.Language, dto.Files)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Unable to build image!"})
 		return
@@ -90,6 +158,8 @@ func (cont *Controller) PostFunction(c *gin.Context) {
 }
 
 func (cont *Controller) PutFunction(c *gin.Context) {
+	userID := c.GetUint("userID")
+
 	var json FunctionDTO
 	if err := c.ShouldBindJSON(&json); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -97,6 +167,23 @@ func (cont *Controller) PutFunction(c *gin.Context) {
 	}
 
 	var uuid uuid.UUID = uuid.MustParse(c.Param("id"))
+
+	isOwner, err := cont.IsOwner(userID, uuid.String())
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": DBError})
+	} else if err != nil {
+		// if the function does not exist, we return a 404
+		c.JSON(http.StatusNotFound, gin.H{"error": NotFound})
+		return
+	}
+
+	if !isOwner {
+		c.JSON(http.StatusForbidden, gin.H{"error": NotOwner})
+		return
+	}
+
 	var function = database.Function{
 		ID:          uuid,
 		Name:        json.Name,
@@ -107,7 +194,7 @@ func (cont *Controller) PutFunction(c *gin.Context) {
 	cont.DB.Save(function)
 
 	cont.CodeStorageService.PutCode(uuid, json.Files)
-	err := cont.buildImage(uuid.String(), json.Language, json.Files)
+	err = cont.buildImage(uuid.String(), json.Language, json.Files)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Unable to build image!"})
 		return
@@ -118,9 +205,31 @@ func (cont *Controller) PutFunction(c *gin.Context) {
 
 func (cont *Controller) DeleteFunction(c *gin.Context) {
 	var uuid uuid.UUID = uuid.MustParse(c.Param("id"))
+	userID := c.GetUint("userID")
+
+	isOwner, err := cont.IsOwner(userID, uuid.String())
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": DBError})
+	} else if err != nil {
+		// if the function does not exist, we return a 404
+		c.JSON(http.StatusNotFound, gin.H{"error": NotFound})
+		return
+	}
+
+	if !isOwner {
+		c.JSON(http.StatusForbidden, gin.H{"error": NotOwner})
+		return
+	}
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": DBError})
+	}
 
 	cont.DB.Delete(&database.Function{ID: uuid})
-	err := cont.CodeStorageService.DeleteCode(uuid)
+	err = cont.CodeStorageService.DeleteCode(uuid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Unable to delete code!"})
 		return
@@ -187,7 +296,7 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 	err = c.DB.Where(&database.Function{ID: fnID}).First(&fn).Error
 
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		ctx.AbortWithStatusJSON(404, gin.H{"error": "Function not found"})
+		ctx.AbortWithStatusJSON(404, gin.H{"error": NotFound})
 		return
 	}
 

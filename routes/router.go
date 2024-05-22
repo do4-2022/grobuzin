@@ -18,7 +18,7 @@ func GetRoutes(db *gorm.DB, JWTSecret string, BuilderEndpoint string, minioClien
 
 	log.Println("Setting up routes", requireAuthMiddleware)
 
-	function.ConfigureRoutes(router, db, minioClient, BuilderEndpoint, scheduler)
+	function.ConfigureRoutes(router, db, minioClient, BuilderEndpoint, scheduler, JWTSecret)
 	user.ConfigureRoutes(router, db, JWTSecret)
 
 	return router
