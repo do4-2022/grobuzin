@@ -34,7 +34,7 @@ func (s *Scheduler) SetStatus(id string, status database.FnStatusCode) error {
 		*s.Context,
 		id,
 		"status",
-		status,
+		int(status),
 	).Err()
 }
 
@@ -79,7 +79,7 @@ func (s *Scheduler) SpawnVM(function database.Function) (fnState database.Functi
 		ID: res.ID,
 		Address: s.Lambdo.URL, 
 		Port: res.Ports[0][0],
-		Status: database.FnReady,
+		Status: int(database.FnReady),
 		LastUsed: "never",
 	}
 

@@ -199,7 +199,8 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 		res, err := c.Scheduler.SpawnVM(fn)
 
 		if err != nil {
-			ctx.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
+			log.Println(err.Error())
+			ctx.AbortWithStatusJSON(500, gin.H{"error": "Could not cold start the function"})
 			return
 		}
 
@@ -209,6 +210,8 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 		)
 
 		if err != nil {
+			log.Println(err.Error())
+			ctx.AbortWithStatusJSON(500, gin.H{"error": "Could not cold start the function"})
 			return
 		} 
 	} else if err != nil { // else if the error is not a record not found, we return an error
@@ -219,7 +222,7 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 
 	stateID := fmt.Sprintf(fnID.String(), ":", fnState.ID)
 
-	if fnState.Status != database.FnReady {
+	if fnState.Status != int(database.FnReady) {
 		log.Println("Waiting for function", fn.ID, "to be ready")
 		time.Sleep(100 * time.Millisecond)
 
@@ -235,14 +238,14 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 				return
 			}
 
-			if fnState.Status == database.FnReady { 
+			if fnState.Status == int(database.FnReady) { 
 				log.Println("Function", fnID, "is ready")
 				break 
 			};
 		}
 
 		// if even after 5 attempts the function is not ready, we return an error
-		if fnState.Status != database.FnReady {
+		if fnState.Status != int(database.FnReady) {
 			ctx.AbortWithStatusJSON(503, gin.H{"error": "Function is not ready"})
 			return
 		}
