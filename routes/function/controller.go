@@ -261,7 +261,7 @@ func (c *Controller) RunFunction(ctx *gin.Context) {
 	}
 	
 	_, err = http.Post(
-		fmt.Sprint("http://", string(fnState.Address), ":", fnState.Port, "/execute"),
+		fmt.Sprint(string(fnState.Address), ":", fnState.Port, "/execute"),
 		"application/json",
 		ctx.Request.Body,
 	)
