@@ -21,7 +21,8 @@ import (
 
 type Config struct {
 	// rootFsStorageDSN string `env:"ROOT_FS_STORAGE_DSN,notEmpty"`
-	LambdoURL			   string `env:"LAMBDO_URL,notEmpty"`
+	LambdoHost			   string `env:"LAMBDO_HOST,notEmpty"`
+	LambdoPort			   int	  `env:"LAMBDO_PORT,notEmpty"`
 	VMStateURL             string `env:"VM_STATE_URL,notEmpty"`
 	FuntionStateStorageDSN string `env:"FUNCTION_STATE_STORAGE_DSN,notEmpty" envDefault:"host=localhost user=postgres password=postgres dbname=postgres port=5432 sslmode=disable TimeZone=Asia/Shanghai"`
 	JWTSecret              string `env:"JWT_SECRET,notEmpty"`
@@ -51,7 +52,8 @@ func main() {
 		Redis:   redis,
 		Context: &ctx,
 		Lambdo: &scheduler.LambdoService{
-			URL: cfg.LambdoURL,
+			Host: cfg.LambdoHost,
+			Port: cfg.LambdoPort,
 			BucketURL: fmt.Sprint(
 				bucketPrefix,
 				cfg.MinioEndpoint, 

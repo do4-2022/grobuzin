@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
 	"github.com/do4-2022/grobuzin/database"
 
 	"github.com/google/uuid"
@@ -67,6 +68,7 @@ func (s *Scheduler) LookForReadyInstance(functionId uuid.UUID, cursor uint64) (f
 } 
 
 func (s *Scheduler) SpawnVM(function database.Function) (fnState database.FunctionState, err error) {
+	url := fmt.Sprint("http://", s.Lambdo.Host)
 	res, err := s.Lambdo.SpawnVM(function)
 
 	if (err != nil) {
@@ -77,7 +79,7 @@ func (s *Scheduler) SpawnVM(function database.Function) (fnState database.Functi
 
 	fnState = database.FunctionState{ 
 		ID: res.ID,
-		Address: s.Lambdo.URL, 
+		Address: url,
 		Port: res.Ports[0][0],
 		Status: int(database.FnReady),
 		LastUsed: "never",

@@ -19,7 +19,8 @@ const (
 )
 
 type LambdoService struct {
-	URL 		string
+	Host 		string
+	Port 		int
 	BucketURL 	string
 }
 
@@ -42,6 +43,10 @@ type LambdoSpawnResponse struct {
 	// this a tuple under the form [host_port, vm_port]
 	// for now we only support one port
 	Ports	[][2]uint16 	`json:"port_mapping"` 
+}
+
+func (service *LambdoService) url() string {
+	return fmt.Sprint("http://", service.Host, ":", service.Port)
 }
 
 func (service *LambdoService) SpawnVM(function database.Function) (data LambdoSpawnResponse, err error) {
@@ -69,7 +74,7 @@ func (service *LambdoService) SpawnVM(function database.Function) (data LambdoSp
 	}
 
 	res, err = http.Post(
-		fmt.Sprint(service.URL, "/spawn"), 
+		fmt.Sprint(service.url(), "/spawn"), 
 		"application/json", 
 		bytes.NewReader(body),
 	)
@@ -90,7 +95,7 @@ func (service *LambdoService) SpawnVM(function database.Function) (data LambdoSp
 }
 
 func (service *LambdoService) DeleteVM(VMID string) (err error) {
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprint(service.URL, "/destroy/", VMID ), nil)
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprint(service.url(), "/destroy/", VMID ), nil)
 	if err != nil {
 		return
 	}
