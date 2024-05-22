@@ -41,12 +41,19 @@ func main() {
 	ctx := context.Background()
 	redis := database.InitRedis(cfg.VMStateURL)
 
+	bucketPrefix := "http://"
+
+	if cfg.MinioSecure {
+		bucketPrefix = "https://"
+	}
+
 	s := &scheduler.Scheduler{
 		Redis:   redis,
 		Context: &ctx,
 		Lambdo: &scheduler.LambdoService{
 			URL: cfg.LambdoURL,
 			BucketURL: fmt.Sprint(
+				bucketPrefix,
 				cfg.MinioEndpoint, 
 				"/", 
 				objectStorage.BucketName,
